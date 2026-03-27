@@ -1,13 +1,39 @@
 const allowedActions = new Set([
+  // Core flow
   "greet",
   "list_menu",
   "clarify",
   "follow_up",
-  "suggest_usual",
   "confirm_order",
   "request_payment",
-  "hint",
   "end",
+
+  // Ordering enhancements
+  "ask_quantity",
+  "ask_customization",
+  "offer_add_on",
+  "handle_unavailable",
+  "handle_invalid",
+
+  // Personalization
+  "suggest_usual",
+  "recall_preference",
+
+  // AAC / learning support
+  "provide_options",
+  "prompt_choice",
+  "model_response",
+  "encourage",
+  "hint",
+
+  // Conversation
+  "small_talk",
+  "repeat",
+  "rephrase",
+
+  // Edge cases
+  "handle_silence",
+  "handle_confusion",
 ]);
 
 export function validateResponse({ llmResponse, expectedAction, menu, fallbackResponse }) {
@@ -24,7 +50,7 @@ export function validateResponse({ llmResponse, expectedAction, menu, fallbackRe
 
   if (
     !allowedActions.has(action) ||
-    action !== expectedAction ||
+    action !== expectedAction && action !== "encourage" && action !== "hint" ||
     !message ||
     message.length > 220 ||
     mentionsUnknownMenu
