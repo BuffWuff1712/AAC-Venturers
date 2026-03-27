@@ -446,3 +446,211 @@ export function decideAction(state = {}, childInput = "") {
 export function getAllowedActions() {
   return [...ACTIONS];
 }
+
+function extractPrototypeCustomizations(text = "", existingCustomizations = []) {
+  const normalized = normalizeText(text);
+  const nextCustomizations = new Set(existingCustomizations);
+
+  if (normalized.includes("no coleslaw")) {
+    nextCustomizations.add("no coleslaw");
+  }
+
+  if (normalized.includes("chilli") || normalized.includes("chili")) {
+    nextCustomizations.add("chilli on the side");
+  }
+
+  if (normalized.includes("extra fries")) {
+    nextCustomizations.add("extra fries");
+  }
+
+  return [...nextCustomizations];
+}
+
+function wantsMenuForPrototype(text = "") {
+  const normalized = normalizeText(text);
+  return (
+    normalized.includes("what do you have") ||
+    normalized.includes("what can i order") ||
+    normalized.includes("menu")
+  );
+}
+
+function soundsLikePayment(text = "") {
+  const normalized = normalizeText(text);
+  return (
+    normalized.includes("pay") ||
+    normalized.includes("paid") ||
+    normalized.includes("cash") ||
+    normalized.includes("card") ||
+    normalized.includes("thank you")
+  );
+}
+
+function soundsStuck(text = "") {
+  const normalized = normalizeText(text);
+  return !normalized || normalized.includes("help") || normalized.includes("don't know") || normalized.includes("idk");
+}
+
+export function decideNextAction({ userInput = "", context, session, childMemory }) {
+  const selectedItem = detectOrderItem(userInput, session.selected_item || "");
+  const selectedCustomizations = extractPrototypeCustomizations(
+    userInput,
+    session.selectedCustomizations || [],
+  );
+  const selectedMenu = context.menu.find((item) => item.name === selectedItem);
+  const hasGreeting = session.total_turns > 0;
+
+  if (!hasGreeting) {
+    return {
+      action: "greet",
+      statePatch: {
+        selectedItem,
+        selectedCustomizations,
+      },
+      signals: {
+        needsClarification: false,
+        objectiveCompleted: false,
+      },
+      selectedMenu,
+    };
+  }
+
+  if ((session.sessionState?.silenceSec || 0) > 20) {
+    return {
+      action: "hint",
+      statePatch: {
+        selectedItem,
+        selectedCustomizations,
+      },
+      signals: {
+        needsClarification: false,
+        objectiveCompleted: false,
+      },
+      selectedMenu,
+    };
+  }
+
+  if (wantsMenuForPrototype(userInput)) {
+    return {
+      action: "list_menu",
+      statePatch: {
+        selectedItem,
+        selectedCustomizations,
+      },
+      signals: {
+        needsClarification: false,
+        objectiveCompleted: false,
+      },
+      selectedMenu,
+    };
+  }
+
+  if (!selectedItem && context.scenario.personality === "personable_familiar" && childMemory) {
+    const normalized = normalizeText(userInput);
+    if (normalized.includes("usual") || normalized.includes("same")) {
+      return {
+        action: "suggest_usual",
+        statePatch: {
+          selectedItem,
+          selectedCustomizations,
+        },
+        signals: {
+          needsClarification: false,
+          objectiveCompleted: false,
+        },
+        selectedMenu,
+      };
+    }
+  }
+
+  if (!selectedItem && soundsStuck(userInput)) {
+    return {
+      action: "hint",
+      statePatch: {
+        selectedItem,
+        selectedCustomizations,
+      },
+      signals: {
+        needsClarification: false,
+        objectiveCompleted: false,
+      },
+      selectedMenu,
+    };
+  }
+
+  if (!selectedItem) {
+    return {
+      action: "clarify",
+      statePatch: {
+        selectedItem,
+        selectedCustomizations,
+      },
+      signals: {
+        needsClarification: true,
+        objectiveCompleted: false,
+      },
+      selectedMenu,
+    };
+  }
+
+  if (!selectedCustomizations.length) {
+    return {
+      action: "follow_up",
+      statePatch: {
+        selectedItem,
+        selectedCustomizations,
+      },
+      signals: {
+        needsClarification: false,
+        objectiveCompleted: false,
+      },
+      selectedMenu,
+    };
+  }
+
+  if (!session.pending_payment) {
+    return {
+      action: "confirm_order",
+      statePatch: {
+        selectedItem,
+        selectedCustomizations,
+        pendingPayment: 1,
+      },
+      signals: {
+        needsClarification: false,
+        objectiveCompleted: false,
+      },
+      selectedMenu,
+    };
+  }
+
+  if (soundsLikePayment(userInput)) {
+    return {
+      action: "end",
+      statePatch: {
+        selectedItem,
+        selectedCustomizations,
+        pendingPayment: 0,
+      },
+      signals: {
+        needsClarification: false,
+        objectiveCompleted: true,
+      },
+      selectedMenu,
+    };
+  }
+
+  return {
+    action: "request_payment",
+    statePatch: {
+      selectedItem,
+      selectedCustomizations,
+      pendingPayment: 1,
+    },
+    signals: {
+      needsClarification: false,
+      objectiveCompleted: false,
+    },
+    selectedMenu,
+  };
+}
