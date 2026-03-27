@@ -1,0 +1,11 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/caregiver/history/page": "/caregiver/history",
+  "/child/select/page": "/child/select",
+  "/caregiver/manage/page": "/caregiver/manage",
+  "/caregiver/scenario/page": "/caregiver/scenario",
+  "/page": "/",
+  "/child/session/[sessionId]/page": "/child/session/[sessionId]",
+  "/caregiver/login/page": "/caregiver/login",
+  "/child/completion/[sessionId]/page": "/child/completion/[sessionId]"
+}

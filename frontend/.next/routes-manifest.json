@@ -1,0 +1,100 @@
+{
+  "version": 3,
+  "pages404": true,
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [
+    {
+      "page": "/child/completion/[sessionId]",
+      "regex": "^/child/completion/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPsessionId": "nxtPsessionId"
+      },
+      "namedRegex": "^/child/completion/(?<nxtPsessionId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/child/session/[sessionId]",
+      "regex": "^/child/session/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPsessionId": "nxtPsessionId"
+      },
+      "namedRegex": "^/child/session/(?<nxtPsessionId>[^/]+?)(?:/)?$"
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/caregiver/history",
+      "regex": "^/caregiver/history(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/caregiver/history(?:/)?$"
+    },
+    {
+      "page": "/caregiver/login",
+      "regex": "^/caregiver/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/caregiver/login(?:/)?$"
+    },
+    {
+      "page": "/caregiver/manage",
+      "regex": "^/caregiver/manage(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/caregiver/manage(?:/)?$"
+    },
+    {
+      "page": "/caregiver/scenario",
+      "regex": "^/caregiver/scenario(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/caregiver/scenario(?:/)?$"
+    },
+    {
+      "page": "/child/select",
+      "regex": "^/child/select(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/child/select(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSuffix": ".prefetch.rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments"
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

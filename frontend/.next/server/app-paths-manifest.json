@@ -1,0 +1,11 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/caregiver/history/page": "app/caregiver/history/page.js",
+  "/child/select/page": "app/child/select/page.js",
+  "/caregiver/manage/page": "app/caregiver/manage/page.js",
+  "/caregiver/scenario/page": "app/caregiver/scenario/page.js",
+  "/page": "app/page.js",
+  "/child/session/[sessionId]/page": "app/child/session/[sessionId]/page.js",
+  "/caregiver/login/page": "app/caregiver/login/page.js",
+  "/child/completion/[sessionId]/page": "app/child/completion/[sessionId]/page.js"
+}
