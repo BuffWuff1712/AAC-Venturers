@@ -1,9 +1,11 @@
 // src/pages/index.js
 import { useState } from "react";
+import { useRouter } from "next/router";
 import Image from "next/image";
 import ProfileButton from "@/components/ProfileButton";
 
 const Home = () => {
+  const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -76,7 +78,18 @@ const Home = () => {
                   autoFocus
                 />
                 <button type="submit" className="rounded-2xl bg-caregiver-peach p-4 text-2xl font-black text-text-brown hover:brightness-95 shadow-md">Unlock</button>
-                <button type="button" onClick={() => setIsModalOpen(false)} className="text-lg font-bold text-gray-400 mt-2">Cancel</button>
+                {/* Styled as a "Back" button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    setPassword("");
+                    setError("");
+                  }}
+                  className="text-lg font-bold text-gray-400 hover:text-text-brown transition-colors"
+                >
+                  ← Not a Caregiver? Go back
+                </button>
               </form>
             </div>
           </div>
@@ -85,18 +98,41 @@ const Home = () => {
         {/* --- REUSABLE SUCCESS MODAL --- */}
         {successMessage && (
           <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-md">
-            <div className="w-full max-w-sm rounded-[40px] bg-white p-12 shadow-2xl text-center border-4 border-child-green">
-              {/* Animated checkmark or icon could go here */}
+            <div className="w-full max-w-sm rounded-[40px] bg-white p-12 shadow-2xl text-center border-4 border-child-green animate-in fade-in zoom-in duration-300">
               <div className="text-6xl mb-4">🌟</div>
               <h2 className="text-4xl font-black text-text-brown mb-6">
                 {successMessage}
               </h2>
-              <button
-                onClick={() => setSuccessMessage("")}
-                className="w-full rounded-2xl bg-child-green p-4 text-2xl font-black text-text-brown hover:brightness-95 shadow-lg active:scale-95 transition-all"
-              >
-                Let's Go!
-              </button>
+
+              <div className="flex flex-col gap-4">
+                <button
+                  onClick={() => {
+                    // 1. Check if it's the Child profile
+                    if (successMessage === "Welcome AAC-Venturer!") {
+                      router.push("/scenarios");
+                    }
+                    // 2. Check if it's the Caregiver profile
+                    else if (successMessage === "Access Granted!") {
+                      router.push("/ManageScenario");
+                    }
+                    // 3. Fallback to just closing the modal
+                    else {
+                      setSuccessMessage("");
+                    }
+                  }}
+                  className="w-full rounded-2xl bg-child-green p-4 text-2xl font-black text-text-brown hover:brightness-95 shadow-lg active:scale-95 transition-all"
+                >
+                  Let's Go!
+                </button>
+
+                {/* New "Go Back" Button */}
+                <button
+                  onClick={() => setSuccessMessage("")}
+                  className="text-lg font-bold text-gray-400 hover:text-text-brown transition-colors"
+                >
+                  ← Wrong profile? Go back
+                </button>
+              </div>
             </div>
           </div>
         )}
