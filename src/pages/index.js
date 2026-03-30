@@ -122,7 +122,7 @@ const Home = () => {
                   }}
                   className="w-full rounded-2xl bg-child-green p-4 text-2xl font-black text-text-brown hover:brightness-95 shadow-lg active:scale-95 transition-all"
                 >
-                  Let's Go!
+                  Let&apos;s Go!
                 </button>
 
                 {/* New "Go Back" Button */}
