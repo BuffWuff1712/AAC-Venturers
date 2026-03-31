@@ -1,7 +1,7 @@
 // ─── pages/scenarios.tsx ─────────────────────────────────────────────────────
 // Scenario selection screen.  Clicking "Start Adventure" on the Canteen card
 // navigates to the canteen scenario page.
-// A ⚙️ Settings button in the top-right opens the settings page.
+// A Settings button in the top-right opens the settings page.
 
 import { useState } from "react";
 import Image from "next/image";

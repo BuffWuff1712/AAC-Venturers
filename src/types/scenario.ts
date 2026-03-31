@@ -55,7 +55,7 @@ export interface PersonalityPair {
   key: string;
   left: string;
   right: string;
-  value: number; // 0 = fully left, 100 = fully right
+  value: "left" | "right";
 }
 
 // App-wide settings shape
