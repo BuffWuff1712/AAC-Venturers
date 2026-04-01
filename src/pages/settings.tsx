@@ -5,7 +5,7 @@
 //   • Character personality pair sliders (Shy ↔ Energetic, etc.)
 //   • Return to Home button
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/router";
 import { AppSettings, PersonalityPair } from "../types/scenario";
 
@@ -42,12 +42,7 @@ const saveSettings = (s: AppSettings) => {   // s: AppSettings is the PARAMETER 
 // ── Component ─────────────────────────────────────────────────────────────────
 const SettingsPage: React.FC = () => {
   const router = useRouter();
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-
-  // Hydrate from localStorage after mount (avoids SSR mismatch)
-  useEffect(() => {
-    setSettings(loadSettings());
-  }, []);
+  const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
 
   // Generic setter that also persists immediately
   const update = (patch: Partial<AppSettings>) => {
