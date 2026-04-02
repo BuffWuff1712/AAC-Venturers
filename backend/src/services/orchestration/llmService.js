@@ -107,7 +107,11 @@ Scenario objective: ${context.scenario.objective}
 Current selected item: ${selectedMenu?.name || normalizedSession.selectedItem || "none"}
 Current customizations: ${(customizations.length ? customizations : normalizedSession.selectedCustomizations).join(", ") || "none"}
 Pending payment: ${normalizedSession.pendingPayment ? "yes" : "no"}
-Child memory: ${childMemory?.favouriteOrder || "none"}
+Child memory: ${
+  action === "suggest_usual" && childMemory?.favouriteOrder
+    ? childMemory.favouriteOrder
+    : "ignore memory for this action"
+}
 Last user input: ${userInput || "none"}
 
 Rules:
@@ -131,6 +135,10 @@ Return valid JSON with this shape only:
     "customizations": ["string"]
   }
 }
+Rules:
+- If Current selected item is not "none", orderSummary.item must match it exactly.
+- Do not use the child's favourite order unless action is "suggest_usual".
+- For confirm_order, request_payment, and end, the message must stay consistent with the selected item.
 `;
 }
 
@@ -150,10 +158,11 @@ function fallbackMessage(action, selectedMenu, customizations = [], childMemory)
       `Okay, ${itemName || "that"}. Any changes or anything else?`,
     confirm_order:
       `Okay! ${itemName || "Your order"}${joinedCustomizations}. Is that correct?`,
-    request_payment:
-      "Please make payment at the counter. Cash or card is okay.",
-    end:
-      "Great job ordering! Here is your food. Enjoy your recess!",
+    request_payment: 
+      `Please make payment for ${itemName|| "your order"}. Cash or card is okay.`,
+    end: 
+        `Great job ordering ${itemName || "your food"}! Here is your food. Enjoy your recess!`,
+
 
     ask_quantity:
       `How many would you like for ${itemName || "that item"}?`,

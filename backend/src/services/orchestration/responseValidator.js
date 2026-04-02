@@ -36,13 +36,21 @@ const allowedActions = new Set([
   "handle_confusion",
 ]);
 
-export function validateResponse({ llmResponse, expectedAction, menu, fallbackResponse }) {
+export function validateResponse({ llmResponse, expectedAction, expectedItem, menu, fallbackResponse }) {
   if (!llmResponse || typeof llmResponse !== "object") {
     return fallbackResponse;
   }
 
   const action = llmResponse.action;
   const message = typeof llmResponse.message === "string" ? llmResponse.message.trim() : "";
+  const responseItem = llmResponse.orderSummary?.item || "";
+  const requiresItemConsistency = new Set([
+    "follow_up",
+    "confirm_order",
+    "request_payment",
+    "end",
+  ]);
+
 
   const menuNames = new Set(menu.map((item) => item.name.toLowerCase()));
   const mentionsUnknownMenu =
@@ -57,6 +65,25 @@ export function validateResponse({ llmResponse, expectedAction, menu, fallbackRe
   ) {
     return fallbackResponse;
   }
+
+  if (
+    expectedItem &&
+    requiresItemConsistency.has(expectedAction) &&
+    responseItem &&
+    responseItem !== expectedItem
+  ) {
+    return fallbackResponse;
+  }
+
+  if (
+    expectedItem &&
+    requiresItemConsistency.has(expectedAction) &&
+    message &&
+    !message.toLowerCase().includes(expectedItem.toLowerCase())
+  ) {
+    return fallbackResponse;
+  }
+
 
   return {
     action,

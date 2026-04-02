@@ -1,6 +1,6 @@
 {
+  "/caregiver/login/page": "app/caregiver/login/page.js",
   "/child/select/page": "app/child/select/page.js",
   "/child/session/[sessionId]/page": "app/child/session/[sessionId]/page.js",
-  "/child/completion/[sessionId]/page": "app/child/completion/[sessionId]/page.js",
-  "/caregiver/history/page": "app/caregiver/history/page.js"
+  "/child/completion/[sessionId]/page": "app/child/completion/[sessionId]/page.js"
 }

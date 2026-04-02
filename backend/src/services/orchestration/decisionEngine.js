@@ -109,6 +109,11 @@ const MENU_ALIASES = {
 };
 
 const PREFERENCE_ALIASES = {
+
+  //
+  nope: "no changes",
+  "I'm good": "no changes",
+
   // ❌ Remove items
   "no coleslaw": "no coleslaw",
   "without coleslaw": "no coleslaw",
@@ -482,6 +487,8 @@ function soundsLikePayment(text = "") {
     normalized.includes("paid") ||
     normalized.includes("cash") ||
     normalized.includes("card") ||
+    normalized.includes("paynow") ||
+    normalized.includes("paylah") ||
     normalized.includes("thank you")
   );
 }

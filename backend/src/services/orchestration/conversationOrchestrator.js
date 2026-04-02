@@ -50,9 +50,11 @@ export async function startConversation({ scenarioId, childName }) {
   const validated = validateResponse({
     llmResponse,
     expectedAction: decision.action,
+    expectedItem: decision.selectedMenu?.name || decision.statePatch.selectedItem || "",
     menu: context.menu,
     fallbackResponse,
   });
+
 
   appendTranscript({
     sessionId,
@@ -134,9 +136,11 @@ export async function handleConversationTurn({ sessionId, userInput }) {
   const validated = validateResponse({
     llmResponse,
     expectedAction: decision.action,
+    expectedItem: decision.selectedMenu?.name || decision.statePatch.selectedItem || "",
     menu: context.menu,
     fallbackResponse,
   });
+
 
   const responseTimeMs = Date.now() - startedAt;
 
