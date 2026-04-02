@@ -15,15 +15,6 @@ const ScenariosPage = () => {
   const maxXP = 1000;
   const progress = (currentXP / maxXP) * 100;
 
-  // Loading state prevents double-tap navigation
-  const [loading, setLoading] = useState(false);
-
-  const startCanteen = () => {
-    if (loading) return;
-    setLoading(true);
-    router.push("/scenario/canteen");
-  };
-
   return (
     <div className="flex min-h-screen flex-col items-center bg-page-peach p-6 font-fredoka">
 
@@ -97,7 +88,7 @@ const ScenariosPage = () => {
             {/* CTA button */}
             <button
               className="w-full bg-child-green hover:bg-green-400 text-text-brown font-black py-4 rounded-2xl text-2xl shadow-[0_6px_0_rgb(163,213,106)] active:shadow-none active:translate-y-[6px] transition-all disabled:opacity-60"
-              onClick={startCanteen}
+              onClick={() => router.push("/scenario/canteen")}
               disabled={loading}
             >
               {loading ? "Loading…" : "Start Adventure"}
