@@ -36,6 +36,9 @@ const allowedActions = new Set([
   "handle_confusion",
 ]);
 
+/**
+ * Ensures the generated reply matches the backend-selected action and grounded order facts.
+ */
 export function validateResponse({ llmResponse, expectedAction, expectedItem, menu, fallbackResponse }) {
   if (!llmResponse || typeof llmResponse !== "object") {
     return fallbackResponse;

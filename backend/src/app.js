@@ -11,6 +11,7 @@ export const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Lightweight health endpoint for local dev and smoke checks.
 app.get("/api/health", (req, res) => {
   res.json({ ok: true });
 });

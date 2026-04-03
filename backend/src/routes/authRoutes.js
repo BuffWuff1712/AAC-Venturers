@@ -4,6 +4,7 @@ import bcryptjs from "bcryptjs";
 
 export const authRoutes = Router();
 
+// Validates the simple demo caregiver login used by the prototype.
 authRoutes.post("/login", (req, res) => {
   const { email, password, role } = req.body;
 

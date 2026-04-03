@@ -8,6 +8,9 @@ import {
   objectivesSeed,
 } from "../data/seedData.js";
 
+/**
+ * Inserts or updates the prototype's default caregiver, scenario, menu, and memory data.
+ */
 export function seedDatabase(db) {
   // Insert users
   const insertUser = db.prepare(`

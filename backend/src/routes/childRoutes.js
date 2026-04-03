@@ -8,6 +8,7 @@ import { loadSession } from "../services/orchestration/contextBuilder.js";
 
 export const childRoutes = Router();
 
+// Lists the child-playable scenarios available in the prototype.
 childRoutes.get("/scenarios", (req, res) => {
   try {
     const scenarios = db
@@ -33,6 +34,7 @@ childRoutes.get("/scenarios", (req, res) => {
   }
 });
 
+// Creates a new practice session and returns the opening assistant message.
 childRoutes.post("/sessions", async (req, res, next) => {
   try {
     const { scenarioId, childId } = req.body;
@@ -43,6 +45,7 @@ childRoutes.post("/sessions", async (req, res, next) => {
   }
 });
 
+// Returns the current session state together with its transcript history.
 childRoutes.get("/sessions/:sessionId", (req, res, next) => {
   try {
     const session = loadSession(req.params.sessionId);
@@ -62,6 +65,7 @@ childRoutes.get("/sessions/:sessionId", (req, res, next) => {
   }
 });
 
+// Convenience chat endpoint that posts a child message into an existing session.
 childRoutes.post("/sessions/:sessionId/respond", async (req, res, next) => {
   try {
     const result = await handleConversationTurn({
