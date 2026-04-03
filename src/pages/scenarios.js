@@ -9,6 +9,7 @@ import { useRouter } from "next/router";
 
 const ScenariosPage = () => {
   const router = useRouter();
+  const [loading, setLoading] = useState(false); // Fixed your bug here @linmyat
 
   // Mock XP progress bar data
   const currentXP = 450;
