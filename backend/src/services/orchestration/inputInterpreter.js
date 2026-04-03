@@ -149,10 +149,43 @@ function buildFallbackInterpretation(childInput, history = []) {
 }
 
 /**
+ * Identifies high-confidence cases that do not need a second LLM interpretation pass.
+ */
+function shouldUseFallbackOnly(interpretation) {
+  if (!interpretation) {
+    return true;
+  }
+
+  const deterministicIntents = new Set([
+    "silence",
+    "ask_menu",
+    "ask_usual",
+    "pay",
+    "repeat",
+    "model_phrase",
+    "ask_help",
+    "affirm",
+    "decline_customization",
+    "unavailable_request",
+    "place_order",
+    "modify_order",
+  ]);
+
+  return (
+    deterministicIntents.has(interpretation.intent) &&
+    Number(interpretation.confidence || 0) >= 0.8
+  );
+}
+
+/**
  * Combines heuristic parsing with LLM extraction to produce structured meaning for the policy engine.
  */
 export async function interpretInput({ childInput, context, session, childMemory, history }) {
   const fallback = buildFallbackInterpretation(childInput, history);
+
+  if (shouldUseFallbackOnly(fallback)) {
+    return fallback;
+  }
 
   const llmInterpretation = await interpretChildInput({
     childInput,

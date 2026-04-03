@@ -21,15 +21,20 @@
       "static/chunks/main-app.js",
       "static/chunks/app/child/select/page.js"
     ],
-    "/caregiver/history/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/caregiver/history/page.js"
-    ],
     "/child/session/[sessionId]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/child/session/[sessionId]/page.js"
+    ],
+    "/child/completion/[sessionId]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/child/completion/[sessionId]/page.js"
+    ],
+    "/caregiver/history/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/caregiver/history/page.js"
     ]
   }
 }
