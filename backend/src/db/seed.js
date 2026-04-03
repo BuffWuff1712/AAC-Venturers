@@ -5,6 +5,9 @@ import {
   scenarioSeed,
 } from "../data/seedData.js";
 
+/**
+ * Inserts or updates the prototype's default caregiver, scenario, menu, and memory data.
+ */
 export function seedDatabase(db) {
   const insertCaregiver = db.prepare(`
     INSERT INTO caregiver_users (email, password, name)

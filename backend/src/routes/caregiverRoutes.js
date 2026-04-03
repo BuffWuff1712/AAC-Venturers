@@ -4,6 +4,7 @@ import { getAnalyticsSummary } from "../services/orchestration/sessionTracker.js
 
 export const caregiverRoutes = Router();
 
+// Returns the single editable caregiver scenario and its menu configuration.
 caregiverRoutes.get("/scenario", (req, res) => {
   const scenario = db.prepare("SELECT * FROM scenarios WHERE id = 1").get();
   const menu = db.prepare("SELECT * FROM menu_items WHERE scenario_id = 1 ORDER BY id").all();
@@ -20,6 +21,7 @@ caregiverRoutes.get("/scenario", (req, res) => {
   });
 });
 
+// Updates the prototype scenario's personality and memory toggle settings.
 caregiverRoutes.put("/scenario", (req, res) => {
   const { personality, memoryEnabled } = req.body;
 
@@ -38,6 +40,7 @@ caregiverRoutes.put("/scenario", (req, res) => {
   });
 });
 
+// Returns aggregate analytics plus recent session history for the caregiver dashboard.
 caregiverRoutes.get("/analytics", (req, res) => {
   res.json(getAnalyticsSummary());
 });

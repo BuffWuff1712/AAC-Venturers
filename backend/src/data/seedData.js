@@ -49,7 +49,6 @@ export const menuSeed = [
       "add cheese",
       "extra cheese",
       "less sauce",
-      "well done",
     ],
   },
   {

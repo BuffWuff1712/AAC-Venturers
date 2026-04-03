@@ -4,6 +4,7 @@ import { loadSession } from "../services/orchestration/contextBuilder.js";
 
 export const conversationRoutes = Router();
 
+// Primary frontend chat endpoint: processes one child message and returns UI-ready session state.
 conversationRoutes.post("/respond", async (req, res, next) => {
   try {
     const { sessionId, childInput } = req.body;

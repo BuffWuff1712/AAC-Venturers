@@ -3,6 +3,9 @@ import { env } from "../../config/env.js";
 
 const client = env.openAiApiKey ? new OpenAI({ apiKey: env.openAiApiKey }) : null;
 
+/**
+ * Converts the caregiver personality setting into short prompt guidance for reply style.
+ */
 function personalityGuide(personality) {
   const map = {
     impatient: "Short, brisk, still kind, sounds busy during recess.",
@@ -14,6 +17,9 @@ function personalityGuide(personality) {
   return map[personality] || map.personable_familiar;
 }
 
+/**
+ * Tells the response generator what each backend-selected action should sound like.
+ */
 function actionGuide(action) {
   const map = {
     greet: "Welcome the child and invite them to order.",
@@ -60,6 +66,9 @@ function actionGuide(action) {
   return map[action] || "Respond naturally and helpfully as a stall owner.";
 }
 
+/**
+ * Normalizes snake_case database session fields into a friendlier prompt payload shape.
+ */
 function normalizeSession(session = {}) {
   return {
     ...session,
@@ -73,6 +82,93 @@ function normalizeSession(session = {}) {
   };
 }
 
+/**
+ * Uses the LLM as a structured extractor that interprets the child's message without choosing policy.
+ */
+export async function interpretChildInput({
+  childInput,
+  context,
+  session,
+  childMemory,
+  history = [],
+  fallbackInterpretation,
+}) {
+  if (!client) {
+    return fallbackInterpretation;
+  }
+
+  const normalizedSession = normalizeSession(session);
+  const menuNames = context.menu.map((item) => item.name).join(", ");
+  const recentHistory = history
+    .slice(-4)
+    .map((entry) => `${entry.speaker}: ${entry.message}`)
+    .join(" | ");
+
+  const prompt = `
+Interpret the child's latest canteen-ordering message for a guided AAC scenario.
+Return JSON only with this shape:
+{
+  "intent": "ask_menu|ask_usual|place_order|modify_order|pay|ask_help|repeat|model_phrase|affirm|decline_customization|unavailable_request|confused|unknown|silence",
+  "item": "string or empty",
+  "preferences": ["string"],
+  "confidence": 0.0,
+  "asksMenu": false,
+  "asksUsual": false,
+  "asksHelp": false,
+  "confused": false,
+  "paymentDone": false,
+  "repeatRequested": false,
+  "modelPhraseRequested": false,
+  "unavailableRequest": false,
+  "affirmative": false,
+  "declineCustomization": false
+}
+
+Menu items: ${menuNames}
+Current selected item: ${normalizedSession.selectedItem || "none"}
+Current customizations: ${(normalizedSession.selectedCustomizations || []).join(", ") || "none"}
+Pending payment: ${normalizedSession.pendingPayment ? "yes" : "no"}
+Child memory: ${childMemory?.favouriteOrder || "none"}
+Recent history: ${recentHistory || "none"}
+Child input: ${childInput || "none"}
+
+Rules:
+- Prefer semantic understanding over exact words.
+- Only use menu items from the menu list.
+- If the child is just saying yes after a suggested usual order, set affirmative=true.
+- If the child is declining customisations, set declineCustomization=true.
+`;
+
+  try {
+    const completion = await client.chat.completions.create({
+      model: env.openAiModel,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: "You extract structured meaning from AAC ordering messages. Output valid JSON only.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      temperature: 0.2,
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    return {
+      ...fallbackInterpretation,
+      ...JSON.parse(content),
+    };
+  } catch (error) {
+    return fallbackInterpretation;
+  }
+}
+
+/**
+ * Builds the constrained response-generation prompt from state, action, memory, and menu context.
+ */
 export function buildPrompt({
   context,
   childMemory,
@@ -81,6 +177,7 @@ export function buildPrompt({
   session,
   selectedMenu,
   customizations = [],
+  interpretation,
 }) {
   const normalizedSession = normalizeSession(session);
 
@@ -113,10 +210,12 @@ Child memory: ${
     : "ignore memory for this action"
 }
 Last user input: ${userInput || "none"}
+Interpreted intent: ${interpretation?.intent || "unknown"}
+Interpreted confidence: ${interpretation?.confidence ?? "unknown"}
 
 Rules:
 - Stay aligned with the current action.
-- If action is "list_menu", mention at most 3-4 items.
+- If action is "list_menu", list all available menu item names and do not mention any customisations.
 - If action is "prompt_choice", give only 2 simple choices.
 - If action is "model_response" or "hint", provide a phrase the child can copy.
 - If action is "confirm_order", clearly restate item and customizations.
@@ -142,6 +241,9 @@ Rules:
 `;
 }
 
+/**
+ * Returns deterministic wording when OpenAI is unavailable or a generated response is rejected.
+ */
 function fallbackMessage(action, selectedMenu, customizations = [], childMemory) {
   const itemName = selectedMenu?.name || "";
   const joinedCustomizations = customizations.length
@@ -216,6 +318,9 @@ function fallbackMessage(action, selectedMenu, customizations = [], childMemory)
   };
 }
 
+/**
+ * Generates wording for the backend-selected action while keeping the order facts grounded in state.
+ */
 export async function generateScenarioReply({
   context,
   childMemory,
@@ -224,9 +329,17 @@ export async function generateScenarioReply({
   session,
   selectedMenu,
   customizations = [],
+  interpretation,
 }) {
   if (!client) {
-    return fallbackMessage(action, selectedMenu, customizations, childMemory);
+    const fallback = fallbackMessage(action, selectedMenu, customizations, childMemory);
+    if (action === "list_menu") {
+      return {
+        ...fallback,
+        message: `We have ${context.menu.map((item) => item.name).join(", ")}. What would you like?`,
+      };
+    }
+    return fallback;
   }
 
   try {
@@ -238,6 +351,7 @@ export async function generateScenarioReply({
       session,
       selectedMenu,
       customizations,
+      interpretation,
     });
 
     const completion = await client.chat.completions.create({
@@ -271,8 +385,14 @@ export async function generateScenarioReply({
       },
     };
   } catch (error) {
+    const fallback = fallbackMessage(action, selectedMenu, customizations, childMemory);
     return {
-      ...fallbackMessage(action, selectedMenu, customizations, childMemory),
+      ...(action === "list_menu"
+        ? {
+            ...fallback,
+            message: `We have ${context.menu.map((item) => item.name).join(", ")}. What would you like?`,
+          }
+        : fallback),
       error: error.message,
     };
   }

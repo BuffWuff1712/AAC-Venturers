@@ -1,5 +1,8 @@
 import { db } from "../../db/database.js";
 
+/**
+ * Creates a new session row to track one child practice run from start to finish.
+ */
 export function createSession({ scenarioId, childName }) {
   const now = new Date().toISOString();
   const result = db
@@ -12,6 +15,9 @@ export function createSession({ scenarioId, childName }) {
   return result.lastInsertRowid;
 }
 
+/**
+ * Appends a transcript entry for either the child or the stall owner.
+ */
 export function appendTranscript({
   sessionId,
   speaker,
@@ -34,11 +40,15 @@ export function appendTranscript({
   );
 }
 
+/**
+ * Persists the results of a turn, including session status, analytics counters, and structured state.
+ */
 export function updateSessionAfterTurn({
   sessionId,
   action,
   userInput,
   statePatch,
+  sessionStatePatch = {},
   responseTimeMs,
   objectiveCompleted,
   clarificationIncrement,
@@ -57,6 +67,7 @@ export function updateSessionAfterTurn({
     ...(JSON.parse(session.session_state_json || "{}")),
     phase: objectiveCompleted ? "completed" : "in_progress",
     lastAction: action,
+    ...sessionStatePatch,
   };
 
   db.prepare(`
@@ -94,6 +105,9 @@ export function updateSessionAfterTurn({
   );
 }
 
+/**
+ * Aggregates top-level caregiver analytics and recent session history from SQLite.
+ */
 export function getAnalyticsSummary() {
   const aggregate = db.prepare(`
     SELECT

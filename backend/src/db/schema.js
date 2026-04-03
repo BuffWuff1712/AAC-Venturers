@@ -1,3 +1,6 @@
+/**
+ * Creates the SQLite tables required for users, scenarios, sessions, transcripts, and analytics.
+ */
 export function createSchema(db) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS caregiver_users (
