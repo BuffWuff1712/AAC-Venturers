@@ -1,78 +1,49 @@
 import { decideNextAction } from "./decisionEngine.js";
 import {
-  loadChildMemory,
   loadScenarioContext,
   loadSession,
 } from "./contextBuilder.js";
 import { generateScenarioReply } from "./llmService.js";
 import { validateResponse } from "./responseValidator.js";
 import {
-  appendTranscript,
   createSession,
-  updateSessionAfterTurn,
+  addInteraction,
+  recordResponse,
+  endSession,
 } from "./sessionTracker.js";
 
-export async function startConversation({ scenarioId, childName }) {
-  const sessionId = createSession({ scenarioId, childName });
+export async function startConversation({ scenarioId, childId }) {
+  const sessionId = createSession({ scenarioId, childId });
   const context = loadScenarioContext(scenarioId);
-  const session = loadSession(sessionId);
-  const childMemory = loadChildMemory(
-    scenarioId,
-    childName,
-    context.scenario.memoryEnabled,
-  );
 
   const decision = decideNextAction({
     userInput: "",
     context,
-    session,
-    childMemory,
+    session: null,
   });
 
   const llmResponse = await generateScenarioReply({
     context,
-    childMemory,
     action: decision.action,
     userInput: "",
-    session,
-    selectedMenu: decision.selectedMenu,
-    customizations: decision.statePatch.selectedCustomizations || [],
   });
 
   const fallbackResponse = {
     action: decision.action,
-    message: "Hi there! What would you like from the western stall today?",
-    hintUsed: false,
-    orderSummary: { item: "", customizations: [] },
+    message: context.settings?.aiPersonalityPrompt || "Hello, how can I help you?",
     source: "fallback",
   };
 
   const validated = validateResponse({
     llmResponse,
     expectedAction: decision.action,
-    expectedItem: decision.selectedMenu?.name || decision.statePatch.selectedItem || "",
-    menu: context.menu,
     fallbackResponse,
   });
 
-
-  appendTranscript({
+  const interactionId = addInteraction({
     sessionId,
-    speaker: "assistant",
-    action: validated.action,
-    message: validated.message,
-    metadata: { source: validated.source },
-  });
-
-  updateSessionAfterTurn({
-    sessionId,
-    action: validated.action,
-    userInput: "",
-    statePatch: decision.statePatch,
-    responseTimeMs: 0,
-    objectiveCompleted: false,
-    clarificationIncrement: 0,
-    hintIncrement: 0,
+    questionText: "",
+    aiResponseText: validated.message,
   });
 
   return {
@@ -81,94 +52,70 @@ export async function startConversation({ scenarioId, childName }) {
     messages: [
       {
         speaker: "assistant",
-        action: validated.action,
         message: validated.message,
       },
     ],
   };
 }
 
-export async function handleConversationTurn({ sessionId, userInput }) {
+export async function handleConversationTurn({ sessionId, userInput, inputMode }) {
   const startedAt = Date.now();
   const session = loadSession(sessionId);
-  const context = loadScenarioContext(session.scenario_id);
-  const childMemory = loadChildMemory(
-    session.scenario_id,
-    session.child_name,
-    context.scenario.memoryEnabled,
-  );
-
-  appendTranscript({
-    sessionId,
-    speaker: "child",
-    message: userInput,
-    metadata: { type: "user_input" },
-  });
+  const context = loadScenarioContext(session.scenarioId);
 
   const decision = decideNextAction({
     userInput,
     context,
     session,
-    childMemory,
   });
 
   const llmResponse = await generateScenarioReply({
     context,
-    childMemory,
     action: decision.action,
     userInput,
     session,
-    selectedMenu: decision.selectedMenu,
-    customizations: decision.statePatch.selectedCustomizations || [],
   });
 
   const fallbackResponse = {
     action: decision.action,
-    message: "Please tell me your order one more time.",
-    hintUsed: decision.action === "hint",
-    orderSummary: {
-      item: decision.selectedMenu?.name || "",
-      customizations: decision.statePatch.selectedCustomizations || [],
-    },
+    message: "I didn't quite understand that. Could you try again?",
     source: "fallback",
   };
 
   const validated = validateResponse({
     llmResponse,
     expectedAction: decision.action,
-    expectedItem: decision.selectedMenu?.name || decision.statePatch.selectedItem || "",
-    menu: context.menu,
     fallbackResponse,
   });
 
+  const responseTimeSeconds = (Date.now() - startedAt) / 1000;
 
-  const responseTimeMs = Date.now() - startedAt;
-
-  appendTranscript({
+  // Record the interaction
+  const interactionId = addInteraction({
     sessionId,
-    speaker: "assistant",
-    action: validated.action,
-    message: validated.message,
-    responseTimeMs,
-    metadata: { source: validated.source },
+    questionText: validated.message,
   });
 
-  updateSessionAfterTurn({
-    sessionId,
-    action: validated.action,
-    userInput,
-    statePatch: decision.statePatch,
-    responseTimeMs,
-    objectiveCompleted: decision.signals.objectiveCompleted,
-    clarificationIncrement: decision.signals.needsClarification ? 1 : 0,
-    hintIncrement: validated.hintUsed ? 1 : 0,
+  // Record the response
+  recordResponse({
+    interactionId,
+    responseText: userInput,
+    inputMode: inputMode || "text",
+    responseTimeSeconds,
+    usedPrompt: decision.signals?.usedPrompt || false,
+    isSuccessful: validated.success || false,
   });
+
+  // Check if session is complete
+  if (decision.signals?.sessionComplete) {
+    endSession(sessionId, decision.signals?.xpEarned || 0);
+  }
 
   return {
-    status: decision.signals.objectiveCompleted ? "completed" : "active",
-    action: validated.action,
+    sessionId,
+    status: decision.signals?.sessionComplete ? "completed" : "active",
     message: validated.message,
-    objectiveCompleted: decision.signals.objectiveCompleted,
-    orderSummary: validated.orderSummary,
+    sessionComplete: decision.signals?.sessionComplete || false,
+    xpEarned: decision.signals?.xpEarned || 0,
   };
 }

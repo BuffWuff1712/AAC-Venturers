@@ -1,70 +1,66 @@
 import {
   caregiverSeed,
-  childMemorySeed,
-  menuSeed,
+  caregiverUserSeed,
+  childSeed,
+  childUserSeed,
   scenarioSeed,
+  scenarioSettingsSeed,
+  objectivesSeed,
 } from "../data/seedData.js";
 
 export function seedDatabase(db) {
+  // Insert users
+  const insertUser = db.prepare(`
+    INSERT OR IGNORE INTO users (user_id, role)
+    VALUES (@user_id, @role)
+  `);
+
+  insertUser.run(caregiverUserSeed);
+  insertUser.run(childUserSeed);
+
+  // Insert caregivers
   const insertCaregiver = db.prepare(`
-    INSERT INTO caregiver_users (email, password, name)
-    VALUES (@email, @password, @name)
-    ON CONFLICT(email) DO UPDATE SET
-      password = excluded.password,
-      name = excluded.name
-  `);
-
-  const insertScenario = db.prepare(`
-    INSERT INTO scenarios (id, key, name, description, objective, personality, memory_enabled)
-    VALUES (@id, @key, @name, @description, @objective, @personality, @memoryEnabled)
-    ON CONFLICT(id) DO UPDATE SET
-      key = excluded.key,
-      name = excluded.name,
-      description = excluded.description,
-      objective = excluded.objective,
-      personality = excluded.personality,
-      memory_enabled = excluded.memory_enabled
-  `);
-
-  const insertMenuItem = db.prepare(`
-    INSERT INTO menu_items (id, scenario_id, name, price, description, customizations_json)
-    VALUES (@id, @scenarioId, @name, @price, @description, @customizationsJson)
-    ON CONFLICT(id) DO UPDATE SET
-      scenario_id = excluded.scenario_id,
-      name = excluded.name,
-      price = excluded.price,
-      description = excluded.description,
-      customizations_json = excluded.customizations_json
-  `);
-
-  const upsertMemory = db.prepare(`
-    INSERT INTO child_memory (scenario_id, child_name, favourite_order)
-    VALUES (@scenarioId, @childName, @favouriteOrder)
+    INSERT OR IGNORE INTO caregivers (caregiver_id, user_id, email, password_hash)
+    VALUES (@caregiver_id, @user_id, @email, @password_hash)
   `);
 
   insertCaregiver.run(caregiverSeed);
+
+  // Insert children
+  const insertChild = db.prepare(`
+    INSERT OR IGNORE INTO children (child_id, user_id, caregiver_id, name, xp)
+    VALUES (@child_id, @user_id, @caregiver_id, @name, @xp)
+  `);
+
+  insertChild.run(childSeed);
+
+  // Insert scenarios
+  const insertScenario = db.prepare(`
+    INSERT OR IGNORE INTO scenarios (scenario_id, title, created_by, is_active)
+    VALUES (@scenario_id, @title, @created_by, @is_active)
+  `);
+
   insertScenario.run(scenarioSeed);
 
-  const memoryExists = db
-    .prepare("SELECT id FROM child_memory WHERE scenario_id = ? AND child_name = ?")
-    .get(scenarioSeed.id, childMemorySeed.childName);
+  // Insert scenario settings
+  const insertSettings = db.prepare(`
+    INSERT OR IGNORE INTO scenario_settings (
+      settings_id, scenario_id, location_name, location_image_url,
+      background_noise, ai_personality_prompt, contingencies
+    )
+    VALUES (@settings_id, @scenario_id, @location_name, @location_image_url,
+            @background_noise, @ai_personality_prompt, @contingencies)
+  `);
 
-  if (!memoryExists) {
-    upsertMemory.run({
-      scenarioId: scenarioSeed.id,
-      childName: childMemorySeed.childName,
-      favouriteOrder: childMemorySeed.favouriteOrder,
-    });
-  }
+  insertSettings.run(scenarioSettingsSeed);
 
-  menuSeed.forEach((item) => {
-    insertMenuItem.run({
-      id: item.id,
-      scenarioId: scenarioSeed.id,
-      name: item.name,
-      price: item.price,
-      description: item.description,
-      customizationsJson: JSON.stringify(item.customizations),
-    });
+  // Insert objectives
+  const insertObjective = db.prepare(`
+    INSERT OR IGNORE INTO objectives (objective_id, scenario_id, description, position, is_required)
+    VALUES (@objective_id, @scenario_id, @description, @position, @is_required)
+  `);
+
+  objectivesSeed.forEach((objective) => {
+    insertObjective.run(objective);
   });
 }

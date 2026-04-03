@@ -1,78 +1,75 @@
 import { db } from "../../db/database.js";
 
 export function loadScenarioContext(scenarioId) {
-  const scenario = db.prepare("SELECT * FROM scenarios WHERE id = ?").get(scenarioId);
+  const scenario = db.prepare("SELECT * FROM scenarios WHERE scenario_id = ?").get(scenarioId);
   if (!scenario) {
     throw new Error("Scenario not found");
   }
 
-  const menu = db
-    .prepare("SELECT * FROM menu_items WHERE scenario_id = ? ORDER BY id")
-    .all(scenarioId)
-    .map((item) => ({
-      id: item.id,
-      name: item.name,
-      price: item.price,
-      description: item.description,
-      customizations: JSON.parse(item.customizations_json),
-    }));
+  const settings = db.prepare("SELECT * FROM scenario_settings WHERE scenario_id = ?").get(scenarioId);
+
+  const objectives = db
+    .prepare("SELECT * FROM objectives WHERE scenario_id = ? ORDER BY position")
+    .all(scenarioId);
 
   return {
     scenario: {
-      id: scenario.id,
-      key: scenario.key,
-      name: scenario.name,
-      description: scenario.description,
-      objective: scenario.objective,
-      personality: scenario.personality,
-      memoryEnabled: Boolean(scenario.memory_enabled),
+      scenarioId: scenario.scenario_id,
+      title: scenario.title,
+      isActive: Boolean(scenario.is_active),
     },
-    menu,
+    settings: settings || {
+      locationName: "Unknown Location",
+      aiPersonalityPrompt: "Be helpful and friendly.",
+      contingencies: "Provide support if needed.",
+      backgroundNoise: 20,
+    },
+    objectives: objectives.map((obj) => ({
+      objectiveId: obj.objective_id,
+      description: obj.description,
+      position: obj.position,
+      isRequired: Boolean(obj.is_required),
+    })),
   };
 }
 
-export function loadChildMemory(scenarioId, childName, enabled) {
-  if (!enabled) {
-    return null;
-  }
-
-  const memory = db
-    .prepare(
-      "SELECT child_name, favourite_order FROM child_memory WHERE scenario_id = ? AND lower(child_name) = lower(?)",
-    )
-    .get(scenarioId, childName);
-
-  return memory
-    ? {
-        childName: memory.child_name,
-        favouriteOrder: memory.favourite_order,
-      }
-    : null;
-}
-
 export function loadSession(sessionId) {
-  const session = db.prepare("SELECT * FROM sessions WHERE id = ?").get(sessionId);
+  const session = db.prepare("SELECT * FROM sessions WHERE session_id = ?").get(sessionId);
   if (!session) {
     throw new Error("Session not found");
   }
 
-  const transcripts = db
-    .prepare("SELECT * FROM transcripts WHERE session_id = ? ORDER BY id")
+  const interactions = db
+    .prepare("SELECT * FROM interactions WHERE session_id = ? ORDER BY asked_at")
     .all(sessionId)
     .map((row) => ({
-      id: row.id,
-      speaker: row.speaker,
-      action: row.action,
-      message: row.message,
-      createdAt: row.created_at,
-      responseTimeMs: row.response_time_ms,
-      metadata: JSON.parse(row.metadata_json),
+      interactionId: row.interaction_id,
+      questionText: row.question_text,
+      aiResponseText: row.ai_response_text,
+      askedAt: row.asked_at,
+      responses: db
+        .prepare("SELECT * FROM responses WHERE interaction_id = ? ORDER BY created_at")
+        .all(row.interaction_id)
+        .map((resp) => ({
+          responseId: resp.response_id,
+          responseText: resp.response_text,
+          inputMode: resp.input_mode,
+          responseTimeSeconds: resp.response_time_seconds,
+          usedPrompt: Boolean(resp.used_prompt),
+          isSuccessful: Boolean(resp.is_successful),
+          createdAt: resp.created_at,
+        })),
     }));
 
   return {
-    ...session,
-    selectedCustomizations: JSON.parse(session.selected_customizations_json || "[]"),
-    sessionState: JSON.parse(session.session_state_json || "{}"),
-    transcripts,
+    sessionId: session.session_id,
+    childId: session.child_id,
+    scenarioId: session.scenario_id,
+    startTime: session.start_time,
+    endTime: session.end_time,
+    totalQuestions: session.total_questions,
+    successfulFirstAttempts: session.successful_first_attempts,
+    xpEarned: session.xp_earned,
+    interactions,
   };
 }
