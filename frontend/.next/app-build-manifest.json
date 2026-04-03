@@ -16,20 +16,15 @@
       "static/chunks/main-app.js",
       "static/chunks/app/caregiver/login/page.js"
     ],
-    "/child/select/page": [
+    "/caregiver/manage/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/child/select/page.js"
+      "static/chunks/app/caregiver/manage/page.js"
     ],
-    "/child/session/[sessionId]/page": [
+    "/caregiver/scenario/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/child/session/[sessionId]/page.js"
-    ],
-    "/child/completion/[sessionId]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/child/completion/[sessionId]/page.js"
+      "static/chunks/app/caregiver/scenario/page.js"
     ]
   }
 }
