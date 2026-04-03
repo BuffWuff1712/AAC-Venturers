@@ -38,10 +38,10 @@ const ManageScenario = () => {
                         <div className="text-center">
                             <h2 className="text-3xl font-black text-text-brown mb-4">{scenario.title}</h2>
                             <div className="flex flex-col gap-3">
-                                <button className="flex items-center justify-center gap-2 w-full bg-caregiver-peach hover:bg-[#ffc891] text-text-brown font-black py-4 rounded-2xl text-xl shadow-[0_5px_0_#e6b181] active:shadow-none active:translate-y-[5px] transition-all">
+                                <button onClick={() => router.push("/MainSettings")} className="flex items-center justify-center gap-2 w-full bg-caregiver-peach hover:bg-[#ffc891] text-text-brown font-black py-4 rounded-2xl text-xl shadow-[0_5px_0_#e6b181] active:shadow-none active:translate-y-[5px] transition-all">
                                     <span>✏️</span> Edit Scenario
                                 </button>
-                                <button className="flex items-center justify-center gap-2 w-full bg-child-green hover:bg-[#b9e67a] text-text-brown font-black py-4 rounded-2xl text-xl shadow-[0_5px_0_#92c45e] active:shadow-none active:translate-y-[5px] transition-all">
+                                <button onClick={() => router.push("/History")} className="flex items-center justify-center gap-2 w-full bg-child-green hover:bg-[#b9e67a] text-text-brown font-black py-4 rounded-2xl text-xl shadow-[0_5px_0_#92c45e] active:shadow-none active:translate-y-[5px] transition-all">
                                     <span>🕒</span> View History
                                 </button>
                             </div>
