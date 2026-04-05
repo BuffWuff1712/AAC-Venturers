@@ -10,25 +10,35 @@ export const childRoutes = Router();
 
 // Lists the child-playable scenarios available in the prototype.
 childRoutes.get("/scenarios", (req, res) => {
-  const scenarios = db.prepare("SELECT * FROM scenarios ORDER BY id").all();
-  res.json(
-    scenarios.map((scenario) => ({
-      id: scenario.id,
-      key: scenario.key,
-      name: scenario.name,
-      description: scenario.description,
-      objective: scenario.objective,
-      personality: scenario.personality,
-      memoryEnabled: Boolean(scenario.memory_enabled),
-    })),
-  );
+  try {
+    const scenarios = db
+      .prepare(`
+        SELECT s.scenario_id, s.title, s.is_active, ss.location_name, ss.location_image_url
+        FROM scenarios s
+        LEFT JOIN scenario_settings ss ON s.scenario_id = ss.scenario_id
+        WHERE s.is_active = 1
+        ORDER BY s.created_at
+      `)
+      .all();
+
+    res.json(
+      scenarios.map((scenario) => ({
+        scenarioId: scenario.scenario_id,
+        title: scenario.title,
+        locationName: scenario.location_name,
+        locationImage: scenario.location_image_url,
+      })),
+    );
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch scenarios", error: error.message });
+  }
 });
 
 // Creates a new practice session and returns the opening assistant message.
 childRoutes.post("/sessions", async (req, res, next) => {
   try {
-    const { scenarioId, childName } = req.body;
-    const session = await startConversation({ scenarioId, childName: childName || "Ari" });
+    const { scenarioId, childId } = req.body;
+    const session = await startConversation({ scenarioId, childId: childId || "unknown" });
     res.status(201).json(session);
   } catch (error) {
     next(error);
@@ -38,18 +48,17 @@ childRoutes.post("/sessions", async (req, res, next) => {
 // Returns the current session state together with its transcript history.
 childRoutes.get("/sessions/:sessionId", (req, res, next) => {
   try {
-    const session = loadSession(Number(req.params.sessionId));
+    const session = loadSession(req.params.sessionId);
     res.json({
-      id: session.id,
-      status: session.status,
-      childName: session.child_name,
-      objectiveCompleted: Boolean(session.objective_completed),
-      selectedItem: session.selected_item,
-      selectedCustomizations: session.selectedCustomizations,
-      transcripts: session.transcripts,
-      averageResponseTimeMs: session.average_response_time_ms,
-      hintsUsed: session.hints_used,
-      clarificationCount: session.clarification_count,
+      sessionId: session.session_id,
+      childId: session.child_id,
+      scenarioId: session.scenario_id,
+      startTime: session.start_time,
+      endTime: session.end_time,
+      totalQuestions: session.total_questions,
+      successfulFirstAttempts: session.successful_first_attempts,
+      xpEarned: session.xp_earned,
+      interactions: session.interactions || [],
     });
   } catch (error) {
     next(error);
@@ -57,11 +66,12 @@ childRoutes.get("/sessions/:sessionId", (req, res, next) => {
 });
 
 // Convenience chat endpoint that posts a child message into an existing session.
-childRoutes.post("/sessions/:sessionId/messages", async (req, res, next) => {
+childRoutes.post("/sessions/:sessionId/respond", async (req, res, next) => {
   try {
     const result = await handleConversationTurn({
-      sessionId: Number(req.params.sessionId),
-      userInput: req.body.message || "",
+      sessionId: req.params.sessionId,
+      userInput: req.body.input || "",
+      inputMode: req.body.inputMode || "text",
     });
     res.json(result);
   } catch (error) {

@@ -1,18 +1,19 @@
 import { db } from "../../db/database.js";
+import { randomUUID } from "crypto";
 
 /**
  * Creates a new session row to track one child practice run from start to finish.
  */
-export function createSession({ scenarioId, childName }) {
+export function createSession({ scenarioId, childId }) {
+  const sessionId = randomUUID();
   const now = new Date().toISOString();
-  const result = db
-    .prepare(`
-      INSERT INTO sessions (scenario_id, child_name, started_at, session_state_json)
-      VALUES (?, ?, ?, ?)
-    `)
-    .run(scenarioId, childName, now, JSON.stringify({ phase: "started" }));
 
-  return result.lastInsertRowid;
+  db.prepare(`
+    INSERT INTO sessions (session_id, child_id, scenario_id, start_time)
+    VALUES (?, ?, ?, ?)
+  `).run(sessionId, childId, scenarioId, now);
+
+  return sessionId;
 }
 
 /**
@@ -20,24 +21,46 @@ export function createSession({ scenarioId, childName }) {
  */
 export function appendTranscript({
   sessionId,
-  speaker,
-  action = null,
-  message,
-  responseTimeMs = null,
-  metadata = {},
+  questionText,
 }) {
+  const interactionId = randomUUID();
+
   db.prepare(`
-    INSERT INTO transcripts (session_id, speaker, action, message, created_at, response_time_ms, metadata_json)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO interactions (interaction_id, session_id, question_text, asked_at)
+    VALUES (?, ?, ?, ?)
+  `).run(interactionId, sessionId, questionText, new Date().toISOString());
+
+  return interactionId;
+}
+
+export function recordResponse({
+  interactionId,
+  responseText,
+  inputMode,
+  responseTimeSeconds,
+  usedPrompt,
+  isSuccessful,
+}) {
+  const responseId = randomUUID();
+
+  db.prepare(`
+    INSERT INTO responses (
+      response_id, interaction_id, response_text, input_mode,
+      response_time_seconds, used_prompt, is_successful, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    sessionId,
-    speaker,
-    action,
-    message,
+    responseId,
+    interactionId,
+    responseText,
+    inputMode,
+    responseTimeSeconds,
+    usedPrompt ? 1 : 0,
+    isSuccessful ? 1 : 0,
     new Date().toISOString(),
-    responseTimeMs,
-    JSON.stringify(metadata),
   );
+
+  return responseId;
 }
 
 /**
@@ -109,41 +132,34 @@ export function updateSessionAfterTurn({
  * Aggregates top-level caregiver analytics and recent session history from SQLite.
  */
 export function getAnalyticsSummary() {
-  const aggregate = db.prepare(`
-    SELECT
-      COUNT(*) AS totalSessions,
-      ROUND(AVG(average_response_time_ms), 2) AS averageResponseTime,
-      SUM(hints_used) AS totalHintsUsed,
-      SUM(clarification_count) AS totalClarifications,
-      SUM(objective_completed) AS completedSessions
-    FROM sessions
-  `).get();
+  const aggregate = db
+    .prepare(`
+      SELECT
+        COUNT(*) AS totalSessions,
+        ROUND(AVG(avg_response_time), 2) AS averageResponseTime,
+        ROUND(AVG(success_rate), 2) AS averageSuccessRate
+      FROM session_analytics
+    `)
+    .get();
 
-  const history = db.prepare(`
-    SELECT
-      id,
-      child_name AS childName,
-      status,
-      objective_completed AS objectiveCompleted,
-      selected_item AS selectedItem,
-      average_response_time_ms AS averageResponseTime,
-      hints_used AS hintsUsed,
-      clarification_count AS clarificationCount,
-      started_at AS startedAt,
-      completed_at AS completedAt
-    FROM sessions
-    ORDER BY id DESC
-    LIMIT 12
-  `).all();
+  const recentSessions = db
+    .prepare(`
+      SELECT
+        s.session_id, s.child_id, s.start_time, s.end_time, s.xp_earned,
+        sa.success_rate, sa.avg_response_time
+      FROM sessions s
+      LEFT JOIN session_analytics sa ON s.session_id = sa.session_id
+      ORDER BY s.start_time DESC
+      LIMIT 10
+    `)
+    .all();
 
   return {
     summary: {
       totalSessions: aggregate.totalSessions || 0,
       averageResponseTime: aggregate.averageResponseTime || 0,
-      totalHintsUsed: aggregate.totalHintsUsed || 0,
-      totalClarifications: aggregate.totalClarifications || 0,
-      completedSessions: aggregate.completedSessions || 0,
+      averageSuccessRate: aggregate.averageSuccessRate || 0,
     },
-    history,
+    recentSessions,
   };
 }

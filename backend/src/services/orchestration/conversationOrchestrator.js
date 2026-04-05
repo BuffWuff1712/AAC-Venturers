@@ -1,5 +1,4 @@
 import {
-  loadChildMemory,
   loadScenarioContext,
   loadSession,
 } from "./contextBuilder.js";
@@ -8,9 +7,10 @@ import { decidePolicy } from "./policyEngine.js";
 import { generateResponse } from "./responseGenerator.js";
 import { validateResponse } from "./responseValidator.js";
 import {
-  appendTranscript,
   createSession,
-  updateSessionAfterTurn,
+  addInteraction,
+  recordResponse,
+  endSession,
 } from "./sessionTracker.js";
 import {
   buildConversationState,
@@ -175,6 +175,43 @@ async function processTurn({ sessionId, userInput, includeChildMessage }) {
     orderSummary: validated.orderSummary,
     interpretation,
   };
+}
+
+/**
+ * Creates a new child session and returns the opening assistant message for the scenario.
+ */
+export async function startConversation({ scenarioId, childName }) {
+  const sessionId = createSession({ scenarioId, childName });
+  const context = loadScenarioContext(scenarioId);
+
+  const result = await processTurn({
+    sessionId,
+    userInput: "",
+    includeChildMessage: false,
+  });
+
+  return {
+    sessionId,
+    scenario: context.scenario,
+    messages: [
+      {
+        speaker: "assistant",
+        action: result.action,
+        message: result.message,
+      },
+    ],
+  };
+}
+
+/**
+ * Handles a child message for an existing session and returns the next assistant turn.
+ */
+export async function handleConversationTurn({ sessionId, userInput }) {
+  return processTurn({
+    sessionId,
+    userInput,
+    includeChildMessage: true,
+  });
 }
 
 /**

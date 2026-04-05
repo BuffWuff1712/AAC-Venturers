@@ -9,6 +9,10 @@ AAC-Venturers is a hackathon-friendly vertical slice for AAC communication pract
 - Database: SQLite with `better-sqlite3`
 - AI: OpenAI API with a guarded orchestration pipeline and fallback local responses
 
+## Documentation
+
+- **Backend API & Database:** See [backend/README.md](backend/README.md) for complete API documentation, schema details, and setup instructions.
+
 ## Project structure
 
 ```text
