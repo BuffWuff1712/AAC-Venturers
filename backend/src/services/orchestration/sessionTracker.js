@@ -1,5 +1,65 @@
-import { db } from "../../db/database.js";
 import { randomUUID } from "crypto";
+import { db } from "../../db/database.js";
+import { loadSession } from "./contextBuilder.js";
+
+function parseState(rawTranscript = "") {
+  if (!rawTranscript) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(rawTranscript);
+  } catch {
+    return {};
+  }
+}
+
+function loadStoredState(sessionId) {
+  const row = db
+    .prepare("SELECT transcript FROM session_recordings WHERE session_id = ?")
+    .get(sessionId);
+
+  return parseState(row?.transcript);
+}
+
+function saveStoredState(sessionId, state) {
+  db.prepare(`
+    INSERT INTO session_recordings (recording_id, session_id, audio_url, transcript)
+    VALUES (?, ?, NULL, ?)
+    ON CONFLICT(session_id) DO UPDATE SET transcript = excluded.transcript
+  `).run(randomUUID(), sessionId, JSON.stringify(state));
+}
+
+function upsertSessionAnalytics({ sessionId, state, totalQuestions }) {
+  const averageResponseTime = Number(state.averageResponseTimeSeconds || 0);
+  const longestResponseTime = Number(state.longestResponseTimeSeconds || averageResponseTime);
+  const shortestResponseTime = Number(
+    state.shortestResponseTimeSeconds ||
+      (averageResponseTime ? averageResponseTime : 0),
+  );
+  const successRate = totalQuestions
+    ? Number((state.successfulFirstAttempts || 0) / totalQuestions)
+    : 0;
+
+  db.prepare(`
+    INSERT INTO session_analytics (
+      session_id, avg_response_time, longest_response_time, shortest_response_time,
+      success_rate, longest_question_id, shortest_question_id
+    )
+    VALUES (?, ?, ?, ?, ?, NULL, NULL)
+    ON CONFLICT(session_id) DO UPDATE SET
+      avg_response_time = excluded.avg_response_time,
+      longest_response_time = excluded.longest_response_time,
+      shortest_response_time = excluded.shortest_response_time,
+      success_rate = excluded.success_rate
+  `).run(
+    sessionId,
+    averageResponseTime,
+    longestResponseTime,
+    shortestResponseTime,
+    successRate,
+  );
+}
 
 /**
  * Creates a new session row to track one child practice run from start to finish.
@@ -13,33 +73,69 @@ export function createSession({ scenarioId, childId }) {
     VALUES (?, ?, ?, ?)
   `).run(sessionId, childId, scenarioId, now);
 
+  const objectives = db
+    .prepare("SELECT objective_id FROM objectives WHERE scenario_id = ? ORDER BY position")
+    .all(scenarioId);
+
+  const insertCompletion = db.prepare(`
+    INSERT INTO objective_completion (completion_id, session_id, objective_id, is_checked)
+    VALUES (?, ?, ?, 0)
+  `);
+
+  objectives.forEach((objective) => {
+    insertCompletion.run(randomUUID(), sessionId, objective.objective_id);
+  });
+
+  saveStoredState(sessionId, {
+    selectedItem: "",
+    selectedCustomizations: [],
+    pendingPayment: false,
+    lastAction: "greet",
+    objectiveCompleted: false,
+    hintsUsed: 0,
+    clarificationCount: 0,
+    averageResponseTimeSeconds: 0,
+    longestResponseTimeSeconds: 0,
+    shortestResponseTimeSeconds: 0,
+    successfulFirstAttempts: 0,
+  });
+
   return sessionId;
 }
 
 /**
- * Appends a transcript entry for either the child or the stall owner.
+ * Appends an assistant turn as an interaction row and keeps the message metadata embedded for reconstruction.
  */
-export function appendTranscript({
-  sessionId,
-  questionText,
-}) {
+export function addInteraction({ sessionId, questionText, action, metadata = {} }) {
   const interactionId = randomUUID();
 
   db.prepare(`
     INSERT INTO interactions (interaction_id, session_id, question_text, asked_at)
     VALUES (?, ?, ?, ?)
-  `).run(interactionId, sessionId, questionText, new Date().toISOString());
+  `).run(
+    interactionId,
+    sessionId,
+    JSON.stringify({
+      displayText: questionText,
+      action,
+      ...metadata,
+    }),
+    new Date().toISOString(),
+  );
 
   return interactionId;
 }
 
+/**
+ * Stores a child response against the current interaction with basic attempt metadata.
+ */
 export function recordResponse({
   interactionId,
   responseText,
-  inputMode,
-  responseTimeSeconds,
-  usedPrompt,
-  isSuccessful,
+  inputMode = "text",
+  responseTimeSeconds = 0,
+  usedPrompt = false,
+  isSuccessful = false,
 }) {
   const responseId = randomUUID();
 
@@ -64,72 +160,90 @@ export function recordResponse({
 }
 
 /**
- * Persists the results of a turn, including session status, analytics counters, and structured state.
+ * Persists the derived session state and syncs the summary columns used by caregiver history pages.
  */
 export function updateSessionAfterTurn({
   sessionId,
   action,
-  userInput,
   statePatch,
-  sessionStatePatch = {},
   responseTimeMs,
   objectiveCompleted,
-  clarificationIncrement,
-  hintIncrement,
+  clarificationIncrement = 0,
+  hintIncrement = 0,
+  successfulFirstAttempt = false,
 }) {
-  const session = db.prepare("SELECT * FROM sessions WHERE id = ?").get(sessionId);
-  const previousAverage = session.average_response_time_ms || 0;
-  const previousTurns = session.total_turns || 0;
-  const nextTurns = previousTurns + 1;
-  const averageResponseTime =
-    previousTurns === 0
-      ? responseTimeMs
-      : (previousAverage * previousTurns + responseTimeMs) / nextTurns;
+  const session = loadSession(sessionId);
+  const currentState = loadStoredState(sessionId);
+  const nextTotalQuestions = session.total_questions + (action === "greet" ? 0 : 1);
+  const nextSuccessfulFirstAttempts =
+    (currentState.successfulFirstAttempts || 0) + (successfulFirstAttempt ? 1 : 0);
+  const responseTimeSeconds = Number((responseTimeMs || 0) / 1000);
+  const measuredResponses = currentState.measuredResponses || 0;
+  const nextMeasuredResponses = responseTimeMs ? measuredResponses + 1 : measuredResponses;
+
+  const averageResponseTimeSeconds = nextMeasuredResponses
+    ? (
+        ((currentState.averageResponseTimeSeconds || 0) * measuredResponses + responseTimeSeconds) /
+        nextMeasuredResponses
+      )
+    : currentState.averageResponseTimeSeconds || 0;
 
   const nextState = {
-    ...(JSON.parse(session.session_state_json || "{}")),
-    phase: objectiveCompleted ? "completed" : "in_progress",
+    ...currentState,
+    ...statePatch,
     lastAction: action,
-    ...sessionStatePatch,
+    objectiveCompleted: Boolean(objectiveCompleted),
+    hintsUsed: (currentState.hintsUsed || 0) + hintIncrement,
+    clarificationCount: (currentState.clarificationCount || 0) + clarificationIncrement,
+    successfulFirstAttempts: nextSuccessfulFirstAttempts,
+    averageResponseTimeSeconds,
+    longestResponseTimeSeconds: Math.max(currentState.longestResponseTimeSeconds || 0, responseTimeSeconds),
+    shortestResponseTimeSeconds:
+      currentState.shortestResponseTimeSeconds == null || currentState.shortestResponseTimeSeconds === 0
+        ? responseTimeSeconds
+        : Math.min(currentState.shortestResponseTimeSeconds, responseTimeSeconds),
+    measuredResponses: nextMeasuredResponses,
   };
+
+  saveStoredState(sessionId, nextState);
 
   db.prepare(`
     UPDATE sessions
-    SET
-      status = ?,
-      completed_at = ?,
-      objective_completed = ?,
-      selected_item = ?,
-      selected_customizations_json = ?,
-      clarification_count = clarification_count + ?,
-      hints_used = hints_used + ?,
-      average_response_time_ms = ?,
-      total_turns = ?,
-      last_action = ?,
-      last_user_input = ?,
-      pending_payment = ?,
-      session_state_json = ?
-    WHERE id = ?
+    SET total_questions = ?, successful_first_attempts = ?, xp_earned = ?
+    WHERE session_id = ?
   `).run(
-    objectiveCompleted ? "completed" : "active",
-    objectiveCompleted ? new Date().toISOString() : null,
-    objectiveCompleted ? 1 : session.objective_completed,
-    statePatch.selectedItem || session.selected_item,
-    JSON.stringify(statePatch.selectedCustomizations || JSON.parse(session.selected_customizations_json || "[]")),
-    clarificationIncrement,
-    hintIncrement,
-    averageResponseTime,
-    nextTurns,
-    action,
-    userInput,
-    statePatch.pendingPayment ?? session.pending_payment,
-    JSON.stringify(nextState),
+    nextTotalQuestions,
+    nextSuccessfulFirstAttempts,
+    objectiveCompleted ? 120 : session.xp_earned,
     sessionId,
   );
+
+  db.prepare(`
+    UPDATE objective_completion
+    SET is_checked = ?
+    WHERE session_id = ?
+  `).run(objectiveCompleted ? 1 : 0, sessionId);
+
+  upsertSessionAnalytics({
+    sessionId,
+    state: nextState,
+    totalQuestions: nextTotalQuestions,
+  });
 }
 
 /**
- * Aggregates top-level caregiver analytics and recent session history from SQLite.
+ * Marks a session as finished and awards the final XP used by the completion screen and caregiver history.
+ */
+export function endSession({ sessionId, xpEarned = 120 }) {
+  db.prepare(`
+    UPDATE sessions
+    SET end_time = ?, xp_earned = ?
+    WHERE session_id = ?
+  `).run(new Date().toISOString(), xpEarned, sessionId);
+}
+
+/**
+ * Aggregates top-level caregiver analytics and recent session history from the new schema tables.
  */
 export function getAnalyticsSummary() {
   const aggregate = db
@@ -145,14 +259,38 @@ export function getAnalyticsSummary() {
   const recentSessions = db
     .prepare(`
       SELECT
-        s.session_id, s.child_id, s.start_time, s.end_time, s.xp_earned,
-        sa.success_rate, sa.avg_response_time
+        s.session_id,
+        s.child_id,
+        c.name AS child_name,
+        s.start_time,
+        s.end_time,
+        s.xp_earned,
+        sa.success_rate,
+        sa.avg_response_time
       FROM sessions s
+      LEFT JOIN children c ON c.child_id = s.child_id
       LEFT JOIN session_analytics sa ON s.session_id = sa.session_id
       ORDER BY s.start_time DESC
       LIMIT 10
     `)
-    .all();
+    .all()
+    .map((session) => {
+      const runtime = loadSession(session.session_id);
+      return {
+        sessionId: session.session_id,
+        childId: session.child_id,
+        childName: session.child_name || "Sample Child",
+        startTime: session.start_time,
+        endTime: session.end_time,
+        xpEarned: session.xp_earned || 0,
+        successRate: session.success_rate || 0,
+        avgResponseTime: session.avg_response_time || 0,
+        objectiveCompleted: Boolean(runtime.objective_completed),
+        selectedItem: runtime.selected_item || "",
+        hintsUsed: runtime.hints_used || 0,
+        clarificationCount: runtime.clarification_count || 0,
+      };
+    });
 
   return {
     summary: {

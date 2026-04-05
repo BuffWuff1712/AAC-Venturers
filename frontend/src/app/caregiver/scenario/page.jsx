@@ -1,5 +1,10 @@
+import { Suspense } from "react";
 import { EditScenarioView } from "../../../views/EditScenarioView";
 
 export default function CaregiverScenarioPage() {
-  return <EditScenarioView />;
+  return (
+    <Suspense fallback={null}>
+      <EditScenarioView />
+    </Suspense>
+  );
 }

@@ -1,4 +1,5 @@
 import {
+  loadChildMemory,
   loadScenarioContext,
   loadSession,
 } from "./contextBuilder.js";
@@ -7,31 +8,28 @@ import { decidePolicy } from "./policyEngine.js";
 import { generateResponse } from "./responseGenerator.js";
 import { validateResponse } from "./responseValidator.js";
 import {
-  createSession,
   addInteraction,
-  recordResponse,
+  createSession,
   endSession,
+  recordResponse,
+  updateSessionAfterTurn,
 } from "./sessionTracker.js";
 import {
   buildConversationState,
-  buildSessionStatePatch,
   buildStatePatch,
 } from "./stateUpdater.js";
 
-/**
- * Builds a safe fallback reply when the generated response is invalid or unavailable.
- */
 function buildFallbackResponse(action, selectedMenu, customizations, context) {
   const fullMenuList = context.menu.map((item) => item.name).join(", ");
   const fallbackMessages = {
     greet: "Hi there! What would you like from the western stall today?",
     list_menu: `We have ${fullMenuList}. What would you like?`,
     clarify: "Please tell me which food item you want.",
-    ask_customization: "Any changes for that item?",
+    ask_customization: "Any changes for that item? You can also say no customisations.",
     offer_add_on: "Would you like a drink or fries with that?",
-    confirm_order: "Okay! Let me confirm your order.",
-    request_payment: "Please make payment at the counter.",
-    end: "Great job ordering! Enjoy your food.",
+    confirm_order: `Okay! ${selectedMenu?.name || "Your order"}. Is that correct?`,
+    request_payment: `Please pay when ready for ${selectedMenu?.name || "your order"}. You can say "I paid" after that.`,
+    end: `Great job ordering ${selectedMenu?.name || "your food"}! Here is your food. Enjoy your recess!`,
     suggest_usual: "Do you want your usual order?",
     recall_preference: "Do you want it the usual way?",
     provide_options: "You can choose from the menu items here.",
@@ -59,45 +57,79 @@ function buildFallbackResponse(action, selectedMenu, customizations, context) {
   };
 }
 
-/**
- * Runs one complete backend turn: interpret input, decide policy, generate wording, validate, and persist.
- */
-async function processTurn({ sessionId, userInput, includeChildMessage }) {
+function findLatestInteractionId(session) {
+  const latestInteraction = [...(session.interactions || [])]
+    .sort((a, b) => new Date(b.askedAt) - new Date(a.askedAt))[0];
+  return latestInteraction?.interactionId || null;
+}
+
+function buildSessionStatePatch(state, interpretation, action, metrics = {}) {
+  return {
+    selectedItem: state.selectedItem,
+    selectedCustomizations: state.selectedCustomizations,
+    pendingPayment:
+      action === "confirm_order" || action === "request_payment"
+        ? true
+        : action === "end"
+          ? false
+          : state.awaitingPayment,
+    lastAction: action,
+    objectiveCompleted: metrics.objectiveCompleted || false,
+    hintsUsed: metrics.hintsUsed,
+    clarificationCount: metrics.clarificationCount,
+    interpretation: {
+      intent: interpretation.intent,
+      confidence: interpretation.confidence,
+      asksMenu: interpretation.asksMenu,
+      asksUsual: interpretation.asksUsual,
+      paymentDone: interpretation.paymentDone,
+    },
+  };
+}
+
+async function processTurn({ sessionId, userInput = "", inputMode = "text", includeChildMessage }) {
   const startedAt = Date.now();
   const session = loadSession(sessionId);
   const context = loadScenarioContext(session.scenario_id);
   const childMemory = loadChildMemory(
     session.scenario_id,
-    session.child_name,
+    session.child_id,
     context.scenario.memoryEnabled,
   );
 
   if (includeChildMessage) {
-    appendTranscript({
-      sessionId,
-      speaker: "child",
-      message: userInput,
-      metadata: { type: "user_input" },
-    });
+    const latestInteractionId = findLatestInteractionId(session);
+    if (latestInteractionId) {
+      recordResponse({
+        interactionId: latestInteractionId,
+        responseText: userInput,
+        inputMode,
+        responseTimeSeconds: 0,
+        usedPrompt: false,
+        isSuccessful: false,
+      });
+    }
   }
+
+  const refreshedSession = includeChildMessage ? loadSession(sessionId) : session;
 
   const interpretation = await interpretInput({
     childInput: userInput,
     context,
-    session,
+    session: refreshedSession,
     childMemory,
-    history: session.transcripts,
+    history: refreshedSession.transcripts,
   });
 
   const state = buildConversationState({
-    session,
+    session: refreshedSession,
     interpretation,
     childMemory,
   });
 
   const policy = decidePolicy({
     context,
-    session,
+    session: refreshedSession,
     interpretation,
     state,
     childMemory,
@@ -120,79 +152,91 @@ async function processTurn({ sessionId, userInput, includeChildMessage }) {
     childMemory,
     action: policy.action,
     userInput,
-    session,
+    session: refreshedSession,
     selectedMenu: policy.selectedMenu,
     customizations: statePatch.selectedCustomizations || [],
     interpretation,
   });
-
-  const fallbackResponse = buildFallbackResponse(
-    policy.action,
-    policy.selectedMenu,
-    statePatch.selectedCustomizations,
-    context,
-  );
 
   const validated = validateResponse({
     llmResponse,
     expectedAction: policy.action,
     expectedItem: policy.selectedMenu?.name || statePatch.selectedItem || "",
     menu: context.menu,
-    fallbackResponse,
+    fallbackResponse: buildFallbackResponse(
+      policy.action,
+      policy.selectedMenu,
+      statePatch.selectedCustomizations,
+      context,
+    ),
   });
 
   const responseTimeMs = includeChildMessage ? Date.now() - startedAt : 0;
-
-  appendTranscript({
+  const assistantInteractionId = addInteraction({
     sessionId,
-    speaker: "assistant",
+    questionText: validated.message,
     action: validated.action,
-    message: validated.message,
-    responseTimeMs,
     metadata: {
       source: validated.source,
+      orderSummary: validated.orderSummary,
       interpretation,
+      responseTimeMs,
     },
   });
+
+  const successfulFirstAttempt =
+    includeChildMessage && !policy.signals.needsClarification && validated.action !== "clarify";
+  const objectiveCompleted = Boolean(policy.signals.objectiveCompleted);
+  const hintsUsed = (refreshedSession.hints_used || 0) + (validated.hintUsed ? 1 : 0);
+  const clarificationCount =
+    (refreshedSession.clarification_count || 0) + (policy.signals.needsClarification ? 1 : 0);
 
   updateSessionAfterTurn({
     sessionId,
     action: validated.action,
-    userInput,
-    statePatch,
-    sessionStatePatch: buildSessionStatePatch(state, interpretation, validated.action),
+    statePatch: buildSessionStatePatch(state, interpretation, validated.action, {
+      objectiveCompleted,
+      hintsUsed,
+      clarificationCount,
+    }),
     responseTimeMs,
-    objectiveCompleted: policy.signals.objectiveCompleted,
+    objectiveCompleted,
     clarificationIncrement: policy.signals.needsClarification ? 1 : 0,
     hintIncrement: validated.hintUsed ? 1 : 0,
+    successfulFirstAttempt,
   });
 
+  if (objectiveCompleted) {
+    endSession({ sessionId, xpEarned: 120 });
+  }
+
   return {
-    status: policy.signals.objectiveCompleted ? "completed" : "active",
+    sessionId,
+    interactionId: assistantInteractionId,
+    status: objectiveCompleted ? "completed" : "active",
     action: validated.action,
     message: validated.message,
-    objectiveCompleted: policy.signals.objectiveCompleted,
+    objectiveCompleted,
     orderSummary: validated.orderSummary,
-    interpretation,
   };
 }
 
-/**
- * Creates a new child session and returns the opening assistant message for the scenario.
- */
-export async function startConversation({ scenarioId, childName }) {
-  const sessionId = createSession({ scenarioId, childName });
+export async function startConversation({ scenarioId, childId }) {
+  const sessionId = createSession({ scenarioId, childId });
   const context = loadScenarioContext(scenarioId);
-
   const result = await processTurn({
     sessionId,
-    userInput: "",
     includeChildMessage: false,
   });
 
   return {
     sessionId,
-    scenario: context.scenario,
+    scenario: {
+      scenarioId: context.scenario.scenarioId,
+      title: context.scenario.title,
+      locationName: context.scenario.locationName,
+      objective: context.scenario.objective,
+    },
     messages: [
       {
         speaker: "assistant",
@@ -203,50 +247,11 @@ export async function startConversation({ scenarioId, childName }) {
   };
 }
 
-/**
- * Handles a child message for an existing session and returns the next assistant turn.
- */
-export async function handleConversationTurn({ sessionId, userInput }) {
+export async function handleConversationTurn({ sessionId, userInput, inputMode = "text" }) {
   return processTurn({
     sessionId,
     userInput,
-    includeChildMessage: true,
-  });
-}
-
-/**
- * Creates a new child session and returns the opening assistant message for the scenario.
- */
-export async function startConversation({ scenarioId, childName }) {
-  const sessionId = createSession({ scenarioId, childName });
-  const context = loadScenarioContext(scenarioId);
-
-  const result = await processTurn({
-    sessionId,
-    userInput: "",
-    includeChildMessage: false,
-  });
-
-  return {
-    sessionId,
-    scenario: context.scenario,
-    messages: [
-      {
-        speaker: "assistant",
-        action: result.action,
-        message: result.message,
-      },
-    ],
-  };
-}
-
-/**
- * Handles a child message for an existing session and returns the next assistant turn.
- */
-export async function handleConversationTurn({ sessionId, userInput }) {
-  return processTurn({
-    sessionId,
-    userInput,
+    inputMode,
     includeChildMessage: true,
   });
 }

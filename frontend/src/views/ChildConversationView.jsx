@@ -24,23 +24,36 @@ export function ChildConversationView() {
   useEffect(() => {
     if (!messages.length && sessionId) {
       api.getSession(sessionId).then((session) => {
-        const nextMessages = session.transcripts.map((item) => ({
-          speaker: item.speaker === "child" ? "child" : "assistant",
-          message: item.message,
-          action: item.action,
-        }));
+        const nextMessages = (session.interactions || []).flatMap((interaction) => {
+          const assistantMessage = interaction.questionText
+            ? [{
+                speaker: "assistant",
+                message: interaction.questionText,
+                action: interaction.action || "greet",
+              }]
+            : [];
+
+          const childMessages = (interaction.responses || []).map((response) => ({
+            speaker: "child",
+            message: response.responseText,
+            action: null,
+          }));
+
+          return [...assistantMessage, ...childMessages];
+        });
+
         setMessages(nextMessages);
         setSessionSnapshot((current) => ({
           ...current,
           state: {
-            sessionId: session.id,
-            status: session.status,
-            objectiveCompleted: session.objectiveCompleted,
-            selectedItem: session.selectedItem,
-            selectedCustomizations: session.selectedCustomizations,
-            hintsUsed: session.hintsUsed,
-            clarificationCount: session.clarificationCount,
-            averageResponseTimeMs: Math.round(session.averageResponseTimeMs || 0),
+            sessionId: session.sessionId,
+            status: session.endTime ? "completed" : "active",
+            objectiveCompleted: Boolean(session.endTime),
+            selectedItem: current?.state?.selectedItem || "",
+            selectedCustomizations: current?.state?.selectedCustomizations || [],
+            hintsUsed: current?.state?.hintsUsed || 0,
+            clarificationCount: current?.state?.clarificationCount || 0,
+            averageResponseTimeMs: current?.state?.averageResponseTimeMs || 0,
           },
         }));
       });
@@ -69,15 +82,15 @@ export function ChildConversationView() {
     setSending(true);
 
     try {
-      const result = await api.respondToConversation({
-        sessionId: Number(sessionId),
-        childInput: childMessage.message,
+      const result = await api.sendMessage(sessionId, {
+        input: childMessage.message,
+        inputMode: "text",
       });
 
       const assistantMessage = {
         speaker: "assistant",
-        message: result.replyText,
-        action: result.replyType,
+        message: result.message,
+        action: result.action,
       };
 
       const nextMessages = [...optimisticMessages, assistantMessage];
@@ -85,14 +98,23 @@ export function ChildConversationView() {
       setSessionSnapshot((current) => ({
         ...current,
         messages: nextMessages,
-        state: result.state,
+        state: {
+          sessionId,
+          status: result.objectiveCompleted ? "completed" : "active",
+          objectiveCompleted: result.objectiveCompleted,
+          selectedItem: result.orderSummary?.item || current?.state?.selectedItem || "",
+          selectedCustomizations: result.orderSummary?.customizations || current?.state?.selectedCustomizations || [],
+          hintsUsed: current?.state?.hintsUsed || 0,
+          clarificationCount: current?.state?.clarificationCount || 0,
+          averageResponseTimeMs: current?.state?.averageResponseTimeMs || 0,
+        },
         orderSummary: {
-          item: result.state?.selectedItem || "",
-          customizations: result.state?.selectedCustomizations || [],
+          item: result.orderSummary?.item || "",
+          customizations: result.orderSummary?.customizations || [],
         },
       }));
 
-      if (result.sessionComplete) {
+      if (result.objectiveCompleted) {
         router.push(`/child/completion/${sessionId}`);
       }
     } catch (requestError) {

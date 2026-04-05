@@ -16,30 +16,30 @@ export function CaregiverHistoryView() {
     return <p className="text-sm text-slate-200">Loading analytics...</p>;
   }
 
-  const { summary, history } = data;
+  const { summary, recentSessions } = data;
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Avg response time"
-          value={`${summary.averageResponseTime} ms`}
+          value={`${summary.averageResponseTime || 0} s`}
           hint="Across stored practice sessions"
         />
-        <StatCard label="Hints used" value={summary.totalHintsUsed} hint="Helps you gauge support needs" />
         <StatCard
-          label="Clarifications"
-          value={summary.totalClarifications}
-          hint="Counts when the child needed to retry"
+          label="Sessions"
+          value={summary.totalSessions || 0}
+          hint="Completed and active practice runs"
         />
         <StatCard
-          label="Success status"
-          value={
-            summary.totalSessions
-              ? `${Math.round((summary.completedSessions / summary.totalSessions) * 100)}%`
-              : "0%"
-          }
-          hint={`${summary.completedSessions}/${summary.totalSessions} sessions reached checkout`}
+          label="Success rate"
+          value={`${Math.round((summary.averageSuccessRate || 0) * 100)}%`}
+          hint="Average first-attempt success across recorded sessions"
+        />
+        <StatCard
+          label="Completed"
+          value={recentSessions.filter((session) => session.objectiveCompleted).length}
+          hint="Sessions that reached checkout successfully"
         />
       </div>
 
@@ -59,8 +59,8 @@ export function CaregiverHistoryView() {
               </tr>
             </thead>
             <tbody>
-              {history.map((session) => (
-                <tr key={session.id} className="border-b border-slate-100">
+              {recentSessions.map((session) => (
+                <tr key={session.sessionId} className="border-b border-slate-100">
                   <td className="py-4 pr-4 font-medium text-ink">{session.childName}</td>
                   <td className="py-4 pr-4">
                     {session.objectiveCompleted ? "Completed" : "In progress"}
@@ -69,7 +69,7 @@ export function CaregiverHistoryView() {
                   <td className="py-4 pr-4">{session.hintsUsed}</td>
                   <td className="py-4 pr-4">{session.clarificationCount}</td>
                   <td className="py-4 pr-4">{session.objectiveCompleted ? "Success" : "Pending"}</td>
-                  <td className="py-4">{Math.round(session.averageResponseTime || 0)} ms</td>
+                  <td className="py-4">{Number(session.avgResponseTime || 0).toFixed(2)} s</td>
                 </tr>
               ))}
             </tbody>

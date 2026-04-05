@@ -32,8 +32,18 @@ export function buildConversationState({ session, interpretation, childMemory })
     session.last_action === "suggest_usual" &&
     interpretation.affirmative &&
     favourite.item;
+  const correctionWithoutNewItem =
+    interpretation.changeOrderRequested &&
+    !interpretation.item;
+  const switchingItems =
+    interpretation.item &&
+    session.selected_item &&
+    interpretation.item !== session.selected_item;
 
   const selectedItem =
+    correctionWithoutNewItem
+      ? session.selected_item || ""
+      :
     (acceptingUsual ? favourite.item : "") ||
     interpretation.item ||
     session.selected_item ||
@@ -42,7 +52,11 @@ export function buildConversationState({ session, interpretation, childMemory })
   const selectedCustomizations = dedupe(
     acceptingUsual
       ? favourite.preferences
-      : [...(session.selectedCustomizations || []), ...(interpretation.preferences || [])],
+      : correctionWithoutNewItem
+        ? []
+      : switchingItems
+        ? [...(interpretation.preferences || [])]
+        : [...(session.selectedCustomizations || []), ...(interpretation.preferences || [])],
   );
 
   const noCustomizations = interpretation.declineCustomization || selectedCustomizations.includes("no customisations");
@@ -50,7 +64,7 @@ export function buildConversationState({ session, interpretation, childMemory })
     ? ["no customisations"]
     : selectedCustomizations.filter((value) => value !== "no customisations");
 
-  const awaitingPayment = Boolean(session.pending_payment);
+  const awaitingPayment = switchingItems || correctionWithoutNewItem ? false : Boolean(session.pending_payment);
   const orderCompleted = interpretation.paymentDone && awaitingPayment;
 
   return {

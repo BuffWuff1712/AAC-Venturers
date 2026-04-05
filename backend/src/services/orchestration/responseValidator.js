@@ -48,7 +48,6 @@ export function validateResponse({ llmResponse, expectedAction, expectedItem, me
   const message = typeof llmResponse.message === "string" ? llmResponse.message.trim() : "";
   const responseItem = llmResponse.orderSummary?.item || "";
   const requiresItemConsistency = new Set([
-    "follow_up",
     "confirm_order",
     "request_payment",
     "end",

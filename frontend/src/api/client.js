@@ -24,17 +24,26 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
-  getScenario() {
-    return request("/caregiver/scenario");
+  getScenarios() {
+    return request("/caregiver/scenarios");
   },
-  updateScenario(payload) {
-    return request("/caregiver/scenario", {
+  getScenario(scenarioId) {
+    return request(`/caregiver/scenarios/${scenarioId}`);
+  },
+  updateScenario(scenarioId, payload) {
+    return request(`/caregiver/scenarios/${scenarioId}/settings`, {
       method: "PUT",
       body: JSON.stringify(payload),
     });
   },
   getAnalytics() {
     return request("/caregiver/analytics");
+  },
+  getScenarioHistory(scenarioId) {
+    return request(`/caregiver/scenarios/${scenarioId}/history`);
+  },
+  getSessionAnalytics(sessionId) {
+    return request(`/caregiver/sessions/${sessionId}/analytics`);
   },
   getChildScenarios() {
     return request("/child/scenarios");
@@ -49,7 +58,7 @@ export const api = {
     return request(`/child/sessions/${sessionId}`);
   },
   sendMessage(sessionId, payload) {
-    return request(`/child/sessions/${sessionId}/messages`, {
+    return request(`/child/sessions/${sessionId}/respond`, {
       method: "POST",
       body: JSON.stringify(payload),
     });

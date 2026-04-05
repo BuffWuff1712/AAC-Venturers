@@ -10,18 +10,27 @@ export function ChildScenarioSelectionView() {
   const router = useRouter();
   const { setSessionSnapshot } = useChildSession();
   const [scenarios, setScenarios] = useState([]);
-  const [childName, setChildName] = useState("Ari");
+  const [childId, setChildId] = useState("");
+  const [childName, setChildName] = useState("Sample Child");
 
   useEffect(() => {
-    api.getChildScenarios().then(setScenarios);
+    Promise.all([
+      api.getChildScenarios(),
+      api.login({ role: "child" }),
+    ]).then(([scenarioData, loginData]) => {
+      setScenarios(scenarioData);
+      setChildId(loginData.user.childId);
+      setChildName(loginData.user.name);
+    });
   }, []);
 
   async function handleStart(scenarioId) {
-    const session = await api.startSession({ scenarioId, childName });
+    const session = await api.startSession({ scenarioId, childId });
     setSessionSnapshot({
       sessionId: session.sessionId,
       scenario: session.scenario,
       messages: session.messages,
+      childId,
       childName,
     });
     router.push(`/child/session/${session.sessionId}`);
@@ -59,15 +68,19 @@ export function ChildScenarioSelectionView() {
 
       <div className="space-y-4">
         {scenarios.map((scenario) => (
-          <Card key={scenario.id} className="bg-white/95">
+          <Card key={scenario.scenarioId} className="bg-white/95">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h3 className="text-2xl font-semibold text-ink">{scenario.name}</h3>
-                <p className="mt-2 text-slate-600">{scenario.description}</p>
-                <p className="mt-4 text-sm font-medium text-slate-700">Goal: {scenario.objective}</p>
+                <h3 className="text-2xl font-semibold text-ink">{scenario.title}</h3>
+                <p className="mt-2 text-slate-600">
+                  Practice ordering from the western stall during school recess.
+                </p>
+                <p className="mt-4 text-sm font-medium text-slate-700">
+                  Goal: Order a food item clearly and complete the purchase.
+                </p>
               </div>
               <button
-                onClick={() => handleStart(scenario.id)}
+                onClick={() => handleStart(scenario.scenarioId)}
                 className="rounded-2xl bg-coral px-5 py-3 font-medium text-white"
               >
                 Start practice

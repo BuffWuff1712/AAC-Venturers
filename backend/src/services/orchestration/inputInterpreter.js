@@ -80,6 +80,26 @@ function detectItem(text = "") {
   return "";
 }
 
+function hasExplicitOrderPhrase(text = "") {
+  return /\b(i want|i would like|i'd like|can i have|i will have|i'll have|order|change to|instead|make it|actually)\b/.test(
+    normalizeText(text),
+  );
+}
+
+function refersToCurrentOrder(text = "") {
+  return /\b(it|that|this|same one|my order)\b/.test(normalizeText(text));
+}
+
+function isCorrectionPhrase(text = "") {
+  return /\b(change|instead|actually|different|not that|wrong order|wrong one|go back)\b/.test(
+    normalizeText(text),
+  );
+}
+
+function asksCustomizationOptions(text = "") {
+  return /\b(customisations|customizations|changes|options)\b/.test(normalizeText(text));
+}
+
 /**
  * Pulls customization preferences out of the child input using normalized alias matching.
  */
@@ -124,10 +144,45 @@ function inferIntent(text = "") {
 /**
  * Produces a deterministic structured interpretation when the LLM is unavailable or uncertain.
  */
-function buildFallbackInterpretation(childInput, history = []) {
-  const item = detectItem(childInput);
+function buildFallbackInterpretation(childInput, history = [], session = {}) {
+  const normalized = normalizeText(childInput);
   const preferences = detectPreferences(childInput);
-  const intent = inferIntent(childInput);
+  const currentSelectedItem = session.selected_item || session.selectedItem || "";
+  const lastAction = session.last_action || session.lastAction || "";
+  const candidateItem = detectItem(childInput);
+  const customizationContext = lastAction === "ask_customization";
+  const confirmationContext = ["confirm_order", "request_payment"].includes(lastAction);
+  const correctionRequested =
+    isCorrectionPhrase(normalized) ||
+    (confirmationContext && /^(no|nope|nah|wrong)$/i.test(normalized));
+  const customizationOptionsRequested =
+    currentSelectedItem &&
+    asksCustomizationOptions(normalized) &&
+    !preferences.length;
+  const item =
+    currentSelectedItem &&
+    preferences.length &&
+    (
+      customizationContext ||
+      refersToCurrentOrder(normalized) ||
+      !hasExplicitOrderPhrase(normalized)
+    )
+      ? ""
+      : candidateItem;
+
+  let intent = inferIntent(childInput);
+
+  if (currentSelectedItem && preferences.length && !item) {
+    intent = "modify_order";
+  }
+
+  if (correctionRequested) {
+    intent = "change_order";
+  }
+
+  if (customizationOptionsRequested) {
+    intent = "ask_customization_options";
+  }
 
   return {
     intent,
@@ -144,6 +199,8 @@ function buildFallbackInterpretation(childInput, history = []) {
     unavailableRequest: intent === "unavailable_request",
     affirmative: intent === "affirm",
     declineCustomization: intent === "decline_customization",
+    changeOrderRequested: correctionRequested,
+    asksCustomizationOptions: customizationOptionsRequested,
     historyLength: history.length,
   };
 }
@@ -166,6 +223,8 @@ function shouldUseFallbackOnly(interpretation) {
     "ask_help",
     "affirm",
     "decline_customization",
+    "change_order",
+    "ask_customization_options",
     "unavailable_request",
     "place_order",
     "modify_order",
@@ -181,7 +240,7 @@ function shouldUseFallbackOnly(interpretation) {
  * Combines heuristic parsing with LLM extraction to produce structured meaning for the policy engine.
  */
 export async function interpretInput({ childInput, context, session, childMemory, history }) {
-  const fallback = buildFallbackInterpretation(childInput, history);
+  const fallback = buildFallbackInterpretation(childInput, history, session);
 
   if (shouldUseFallbackOnly(fallback)) {
     return fallback;

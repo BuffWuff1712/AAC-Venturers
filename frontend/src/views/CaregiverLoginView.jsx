@@ -8,13 +8,14 @@ import { Card } from "../components/Card";
 
 export function CaregiverLoginView() {
   const router = useRouter();
+  const [email, setEmail] = useState("teacher@example.com");
   const [password, setPassword] = useState("demo123");
   const [error, setError] = useState("");
 
   async function handleSubmit(event) {
     event.preventDefault();
     try {
-      await api.login({ password });
+      await api.login({ role: "caregiver", email, password });
       router.push("/caregiver/manage");
     } catch (err) {
       setError(err.message);
@@ -40,6 +41,15 @@ export function CaregiverLoginView() {
           Use the demo password to jump straight into the caregiver controls.
         </p>
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-slate-700">Demo email</span>
+            <input
+              type="email"
+              className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none ring-coral transition focus:ring-2"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </label>
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-slate-700">Demo password</span>
             <input

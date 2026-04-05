@@ -74,6 +74,31 @@ export function decidePolicy({ context, session, interpretation, state, childMem
     return { action: "list_menu", selectedMenu, signals: { needsClarification: false, objectiveCompleted: false } };
   }
 
+  if (interpretation.asksCustomizationOptions && selectedMenu) {
+    return {
+      action: "ask_customization",
+      selectedMenu,
+      signals: { needsClarification: false, objectiveCompleted: false },
+    };
+  }
+
+  if (interpretation.changeOrderRequested) {
+    if (interpretation.item) {
+      const changedMenu = context.menu.find((item) => item.name === interpretation.item);
+      return {
+        action: "ask_customization",
+        selectedMenu: changedMenu,
+        signals: { needsClarification: false, objectiveCompleted: false },
+      };
+    }
+
+    return {
+      action: "follow_up",
+      selectedMenu,
+      signals: { needsClarification: false, objectiveCompleted: false },
+    };
+  }
+
   if (!state.selectedItem && interpretation.unavailableRequest) {
     return { action: "handle_unavailable", selectedMenu, signals: { needsClarification: true, objectiveCompleted: false } };
   }
