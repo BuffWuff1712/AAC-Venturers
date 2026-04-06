@@ -156,15 +156,8 @@ const CanteenScenario: React.FC = () => {
 
       addEntry("child", "You", text);
 
-      // If step 2 (child said hi back), friend then asks "How are you?"
-      if (currentStep.id === 2) {
-        setTimeout(() => {
-          addEntry("friend", "Friend", "How are you?");
-          advanceStep();
-        }, 800);
-      } else {
-        setTimeout(advanceStep, 600);
-      }
+      // Advance to the next scripted turn.
+      setTimeout(advanceStep, 600);
     },
     [currentStep, addEntry, advanceStep, stopCountdown]
   );
