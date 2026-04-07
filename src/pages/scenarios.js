@@ -27,13 +27,14 @@ const ScenariosPage = () => {
         <span className="text-2xl">←</span> Back
       </button>
 
-      {/* ── Settings button (top-right) ─────────────────────────────────────── */}
+      {/* ── Settings button (top-right) ─────────────────────────────────────── 
       <button
         onClick={() => router.push("/settings")}
         className="absolute top-6 right-6 flex items-center gap-2 bg-white px-6 py-3 rounded-2xl font-black text-text-brown shadow-[0_4px_0_#e5e7eb] hover:shadow-none hover:translate-y-[4px] active:scale-95 transition-all"
       >
         ⚙️ Settings
       </button>
+      */}
 
       {/* ── XP bar ─────────────────────────────────────────────────────────── */}
       <div className="w-full max-w-2xl bg-white rounded-full p-2 shadow-md border-4 border-white mb-10 mt-16 relative">
