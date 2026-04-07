@@ -82,7 +82,7 @@ const ScenariosPage = () => {
             </p>
 
             {/* Step count pill */}
-            <div className="inline-block bg-purple-100 text-purple-600 font-bold px-4 py-1 rounded-full text-sm mb-4">
+            <div className="inline-block bg-orange-100 text-text-brown font-bold px-4 py-1 rounded-full text-sm mb-4">
               4 steps
             </div>
 

@@ -1,6 +1,5 @@
 // ─── TranscriptPanel ─────────────────────────────────────────────────────────
-// Scrollable log at the bottom of the screen showing the full conversation.
-// Each entry clearly labels the speaker and auto-scrolls to the latest line.
+// Scrollable log showing the full conversation.
 
 import React, { useEffect, useRef } from "react";
 import { TranscriptEntry } from "../../types/scenario";
@@ -9,35 +8,39 @@ interface TranscriptPanelProps {
   entries: TranscriptEntry[];
 }
 
-// Map speaker key → colour accent so each speaker is visually distinct
+// Map speaker key → color accent, updated to match theme
 const SPEAKER_COLORS: Record<string, string> = {
-  friend:  "text-purple-600",
-  child:   "text-blue-600",
-  auntie:  "text-orange-600",
-  teacher: "text-green-600",
+  friend: "text-caregiver-peach", // Caregiver Orange/Peach
+  child: "text-child-green",    // Child Green
+  auntie: "text-red-500",        // Keep as warning/different color
+  teacher: "text-text-brown",     // Brown/Main text color
 };
 
 const TranscriptPanel: React.FC<TranscriptPanelProps> = ({ entries }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to newest entry whenever transcript updates
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [entries]);
 
   return (
-    <div className="w-full rounded-2xl bg-white/90 backdrop-blur-sm border border-gray-100 shadow-inner">
-      {/* Header row */}
+    // Background updated to use a more solid white/90 for better text visibility
+    <div className="w-full rounded-2xl bg-white/90 backdrop-blur-sm border-2 border-caregiver-peach shadow-lg">
+
+      {/* Header row
+          Color updated to text-text-brown with opacity */}
       <div className="px-5 pt-3 pb-1 border-b border-gray-100">
-        <p className="text-xs font-extrabold uppercase tracking-widest text-gray-400">
+        <p className="text-xs font-extrabold uppercase tracking-widest text-text-brown opacity-60">
           Conversation Log
         </p>
       </div>
 
-      {/* Scrollable entry list – max height keeps it compact */}
-      <div className="overflow-y-auto max-h-28 px-5 py-3 space-y-1">
+      {/* Scrollable entry list
+          Max height set to max-h-40 to keep it manageable */}
+      <div className="overflow-y-auto max-h-40 px-5 py-4 space-y-2">
         {entries.length === 0 && (
-          <p className="text-sm text-gray-400 italic">
+          // Color updated to text-text-brown with opacity
+          <p className="text-sm text-text-brown opacity-50 italic">
             The conversation will appear here…
           </p>
         )}
@@ -45,22 +48,22 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({ entries }) => {
         {entries.map((entry, idx) => (
           <div
             key={idx}
-            className="flex items-baseline gap-2 text-base leading-snug"
+            className="flex items-baseline gap-2 text-base leading-tight"
           >
-            {/* Bold coloured speaker label */}
+            {/* Bold colored speaker label
+                Default color set to text-text-brown */}
             <span
-              className={`font-extrabold shrink-0 ${
-                SPEAKER_COLORS[entry.speaker] ?? "text-gray-700"
-              }`}
+              className={`font-black shrink-0 ${SPEAKER_COLORS[entry.speaker] ?? "text-text-brown"
+                }`}
             >
               {entry.label}:
             </span>
-            {/* Transcript text */}
-            <span className="text-gray-700 font-medium">{entry.text}</span>
+            {/* Transcript text
+                Color set to text-text-brown */}
+            <span className="text-text-brown font-medium">{entry.text}</span>
           </div>
         ))}
 
-        {/* Invisible anchor for auto-scroll */}
         <div ref={bottomRef} />
       </div>
     </div>

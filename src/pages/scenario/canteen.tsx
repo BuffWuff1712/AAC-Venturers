@@ -213,8 +213,11 @@ const CanteenScenario: React.FC = () => {
       };
       // Pass result as query param (JSON-encoded); real apps would use state management
       router.push({
-        pathname: "/scenario/completion",
-        query: { result: JSON.stringify(result) },
+        pathname: "/celebration",
+        query: {
+          result: JSON.stringify(result),
+          from: "canteen" // This helps the 'Try Again' button find this file
+        },
       });
     }, delay);
     return () => clearTimeout(t);
@@ -285,7 +288,7 @@ const CanteenScenario: React.FC = () => {
                 setIsRecording(false);
                 stopCountdown();
               }}
-              // onNoSpeech={handleNoSpeech}
+            // onNoSpeech={handleNoSpeech}
             />
           </div>
 

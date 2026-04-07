@@ -62,39 +62,58 @@ const AchievementBanner: React.FC<AchievementBannerProps> = ({
   return (
     <div
       // The banner slides down then fades – keyframes defined in global CSS
-      className="achievement-banner fixed top-4 left-1/2 -translate-x-1/2 z-50
-        flex items-center gap-4 bg-white rounded-2xl shadow-2xl border-4 border-purple-400
-        px-6 py-3 min-w-[320px]"
+      className="achievement-banner fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100]
+        flex flex-col items-center gap-2 bg-white rounded-[40px] shadow-2xl border-8 border-child-green
+        px-10 py-8 min-w-[400px] text-center"
       style={{
         animation: `achievementSlideIn 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards,
                     achievementFadeOut 0.5s ease-in ${durationMs - 500}ms forwards`,
       }}
     >
-      {/* Trophy icon */}
-      <span className="text-4xl">🏆</span>
+      <div className="text-7xl mb-2 animate-bounce">🏆</div>
 
       <div>
-        <p className="text-xs font-extrabold uppercase tracking-widest text-purple-500">
+        <p className="text-sm font-black uppercase tracking-[0.2em] text-caregiver-peach">
           Achievement Unlocked!
         </p>
-        <p className="text-xl font-black text-gray-800">{achievementName}</p>
+        <p className="text-4xl font-black text-text-brown mt-1">
+          {achievementName}
+        </p>
       </div>
 
       {/* Star icon */}
-      <span className="text-3xl ml-auto">⭐</span>
+      <div className="flex gap-4 mt-4">
+        <span className="text-4xl animate-pulse">⭐</span>
+        <span className="text-4xl animate-pulse delay-75">⭐</span>
+        <span className="text-4xl animate-pulse delay-150">⭐</span>
+      </div>
+
 
       {/* Keyframe styles injected inline – avoids needing a separate CSS file */}
       <style>{`
-        @keyframes achievementSlideIn {
-          from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
-          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+        @keyframes achievementPopIn {
+          from { 
+            opacity: 0; 
+            transform: translate(-50%, -40%) scale(0.5); 
+          }
+          to { 
+            opacity: 1; 
+            transform: translate(-50%, -50%) scale(1); 
+          }
         }
         @keyframes achievementFadeOut {
-          from { opacity: 1; }
-          to   { opacity: 0; pointer-events: none; }
+          from { 
+            opacity: 1; 
+            transform: translate(-50%, -50%) scale(1); 
+          }
+          to { 
+            opacity: 0; 
+            transform: translate(-50%, -60%) scale(0.9); 
+            pointer-events: none; 
+          }
         }
       `}</style>
-    </div>
+    </div >
   );
 };
 

@@ -1,6 +1,5 @@
 // ─── InstructionBanner ───────────────────────────────────────────────────────
-// Renders the purple instruction banner at the top of every scenario screen.
-// Shows "STEP X OF Y" and the current instruction text.
+// Renders the instruction banner at the top of every scenario screen.
 
 import React from "react";
 
@@ -17,15 +16,17 @@ const InstructionBanner: React.FC<InstructionBannerProps> = ({
   instruction,
   timeRemaining,
 }) => {
-  // Calculate progress width for the thin progress bar inside the banner
   const progressPct = ((currentStep - 1) / totalSteps) * 100;
 
   return (
-    <div className="relative w-full overflow-hidden rounded-2xl bg-purple-600 px-6 py-4 shadow-lg">
-      {/* ── Thin progress bar along the bottom of the banner ── */}
-      <div className="absolute bottom-0 left-0 h-1 w-full bg-purple-800/40">
+    // Changed background to bg-caregiver-peach, updated z-index to stay on top
+    <div className="relative w-full overflow-hidden rounded-2xl bg-caregiver-peach px-6 py-4 shadow-lg z-20">
+
+      {/* ── Thin progress bar along the bottom of the banner ──
+          Updated color to child-green for better visibility against peach */}
+      <div className="absolute bottom-0 left-0 h-1.5 w-full bg-child-green/60">
         <div
-          className="h-full bg-white/70 transition-all duration-700 ease-out"
+          className="h-full bg-child-green transition-all duration-700 ease-out"
           style={{ width: `${progressPct}%` }}
         />
       </div>
@@ -33,36 +34,38 @@ const InstructionBanner: React.FC<InstructionBannerProps> = ({
       <div className="flex items-center justify-between">
         {/* Left: step info + instruction */}
         <div>
-          <p className="text-sm font-bold uppercase tracking-widest text-purple-200">
+          {/* Color changed to text-text-brown with opacity */}
+          <p className="text-xs font-bold uppercase tracking-widest text-text-brown opacity-60">
             Step {currentStep} of {totalSteps}
           </p>
-          <p className="mt-0.5 text-2xl font-black text-white drop-shadow-sm">
+          {/* Color changed to text-text-brown, font weight increased to font-black */}
+          <p className="mt-0.5 text-2xl font-black text-text-brown drop-shadow-sm">
             {instruction}
           </p>
         </div>
 
-        {/* Right: optional countdown timer badge */}
+        {/* Right: optional countdown timer badge
+            Colors updated to use white/brown accents with red for warning */}
         {timeRemaining !== undefined && (
           <div
-            className={`flex items-center gap-2 rounded-full border-2 bg-white/10 px-4 py-2 text-white backdrop-blur-sm ${
-              timeRemaining <= 10
-                ? "animate-pulse border-red-300"
-                : "border-white/30"
-            }`}
+            className={`flex items-center gap-2 rounded-full border-2 px-4 py-2 text-lg font-black backdrop-blur-sm ${timeRemaining <= 10
+                ? "animate-pulse border-red-500 bg-red-50 text-red-600"
+                : "border-white/50 bg-white/20 text-text-brown"
+              }`}
           >
-            {/* Clock icon (inline SVG – no extra package needed) */}
+            {/* Clock icon, color set by parent text color */}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               className="h-5 w-5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
-              strokeWidth={2}
+              strokeWidth={3}
             >
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
-            <span className="text-lg font-black">{timeRemaining}s</span>
+            <span>{timeRemaining}s</span>
           </div>
         )}
       </div>
