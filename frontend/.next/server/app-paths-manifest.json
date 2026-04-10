@@ -1,0 +1,6 @@
+{
+  "/page": "app/page.js",
+  "/caregiver/login/page": "app/caregiver/login/page.js",
+  "/child/select/page": "app/child/select/page.js",
+  "/caregiver/history/page": "app/caregiver/history/page.js"
+}
