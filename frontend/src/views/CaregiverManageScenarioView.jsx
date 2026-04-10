@@ -25,7 +25,7 @@ export function CaregiverManageScenarioView() {
     return <p className="text-sm text-slate-200">Loading scenario...</p>;
   }
 
-  const combinedPrompt = `${details?.settings?.ai_personality_prompt || ""} ${details?.settings?.contingencies || ""}`.toLowerCase();
+  const combinedPrompt = `${details?.settings?.aiPersonalityPrompt || ""} ${details?.settings?.contingencies || ""}`.toLowerCase();
   const personality = combinedPrompt.includes("hard of hearing")
     ? "hard_of_hearing"
     : combinedPrompt.includes("brisk") || combinedPrompt.includes("busy") || combinedPrompt.includes("impatient")

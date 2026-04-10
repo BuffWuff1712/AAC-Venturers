@@ -49,7 +49,7 @@ export function EditScenarioView() {
 
   useEffect(() => {
     api.getScenario(scenarioId).then((data) => {
-      const prompt = data.settings?.ai_personality_prompt || "";
+      const prompt = data.settings?.aiPersonalityPrompt || "";
       const combined = `${prompt} ${data.settings?.contingencies || ""}`.toLowerCase();
       const personality = combined.includes("hard of hearing")
         ? "hard_of_hearing"
