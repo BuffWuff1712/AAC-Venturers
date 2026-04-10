@@ -99,6 +99,9 @@ export async function interpretChildInput({
 
   const normalizedSession = normalizeSession(session);
   const menuNames = context.menu.map((item) => item.name).join(", ");
+  const scenarioObjectives = (context.scenario.objectives || [])
+    .map((objective) => objective.description)
+    .join(" | ");
   const recentHistory = history
     .slice(-4)
     .map((entry) => `${entry.speaker}: ${entry.message}`)
@@ -125,6 +128,9 @@ Return JSON only with this shape:
 }
 
 Menu items: ${menuNames}
+Scenario objectives: ${scenarioObjectives || context.scenario.objective || "none"}
+Scenario AI personality guidance: ${context.scenario.aiPersonalityPrompt || "none"}
+Scenario contingencies: ${context.scenario.contingencies || "none"}
 Current selected item: ${normalizedSession.selectedItem || "none"}
 Current customizations: ${(normalizedSession.selectedCustomizations || []).join(", ") || "none"}
 Pending payment: ${normalizedSession.pendingPayment ? "yes" : "no"}
@@ -187,6 +193,9 @@ export function buildPrompt({
         `${item.name} ($${item.price.toFixed(2)}): ${item.customizations.join(", ")}`
     )
     .join("; ");
+  const scenarioObjectives = (context.scenario.objectives || [])
+    .map((objective, index) => `${index + 1}. ${objective.description}`)
+    .join(" ");
 
   return `
 You are a western stall owner in a school canteen.
@@ -197,9 +206,12 @@ Do not explain your reasoning.
 Only talk about this menu: ${menuText}.
 
 Personality: ${personalityGuide(context.scenario.personality)}
+Configured AI personality prompt: ${context.scenario.aiPersonalityPrompt || "none"}
 Current action: ${action}
 Action instruction: ${actionGuide(action)}
 Scenario objective: ${context.scenario.objective}
+Scenario objective list: ${scenarioObjectives || "none"}
+Scenario contingencies: ${context.scenario.contingencies || "none"}
 
 Current selected item: ${selectedMenu?.name || normalizedSession.selectedItem || "none"}
 Current customizations: ${(customizations.length ? customizations : normalizedSession.selectedCustomizations).join(", ") || "none"}
@@ -215,6 +227,8 @@ Interpreted confidence: ${interpretation?.confidence ?? "unknown"}
 
 Rules:
 - Stay aligned with the current action.
+- Follow the configured AI personality prompt and contingencies when they fit the current action.
+- Keep the response supportive of the scenario objectives without explicitly listing the objectives to the child.
 - If action is "list_menu", list all available menu item names and do not mention any customisations.
 - If action is "prompt_choice", give only 2 simple choices.
 - If action is "model_response" or "hint", provide a phrase the child can copy.

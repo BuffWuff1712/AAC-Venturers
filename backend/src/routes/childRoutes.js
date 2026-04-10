@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { db } from "../db/database.js";
 import {
+  buildDefaultScenarioSettings,
+  mergeScenarioSettings,
+} from "../data/scenarioDefaults.js";
+import {
   handleConversationTurn,
   startConversation,
 } from "../services/orchestration/conversationOrchestrator.js";
@@ -88,12 +92,26 @@ childRoutes.get("/scenarios", (req, res) => {
       .all();
 
     res.json(
-      scenarios.map((scenario) => ({
-        scenarioId: scenario.scenario_id,
-        title: scenario.title,
-        locationName: scenario.location_name,
-        locationImage: scenario.location_image_url,
-      })),
+      scenarios.map((scenario) => {
+        const settings = mergeScenarioSettings(
+          {
+            scenario_id: scenario.scenario_id,
+            location_name: scenario.location_name,
+            location_image_url: scenario.location_image_url,
+          },
+          buildDefaultScenarioSettings({
+            scenarioId: scenario.scenario_id,
+            title: scenario.title,
+          }),
+        );
+
+        return {
+          scenarioId: scenario.scenario_id,
+          title: scenario.title,
+          locationName: settings.location_name,
+          locationImage: settings.location_image_url,
+        };
+      }),
     );
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch scenarios", error: error.message });

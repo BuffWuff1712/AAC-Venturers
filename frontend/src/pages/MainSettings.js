@@ -59,6 +59,13 @@ const fallbackScenario = {
 
 const FALLBACK_LOCATION_IMAGE = "/images/canteen.jpg";
 
+function parseObjectivesInput(value) {
+  return String(value || "")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*\d+\.\s*/, "").trim())
+    .filter(Boolean);
+}
+
 function resolveScenarioImage(locationImage) {
   if (typeof locationImage !== "string") {
     return FALLBACK_LOCATION_IMAGE;
@@ -107,9 +114,7 @@ const MainSettings = () => {
         setLoadedScenario(fallbackScenario);
         setFormData({
           locationName: fallbackScenario.settings.location_name,
-          locationImage: resolveScenarioImage(
-            fallbackScenario.settings.location_image_url
-          ),
+          locationImage: resolveScenarioImage(fallbackScenario.settings.location_image_url),
           objectives: fallbackScenario.objectives
             .map((objective, index) => `${index + 1}. ${objective.description}`)
             .join("\n"),
@@ -127,10 +132,8 @@ const MainSettings = () => {
         const nextScenario = data || fallbackScenario;
         setLoadedScenario(nextScenario);
         setFormData({
-          locationName: nextScenario.settings?.location_name || "Canteen",
-          locationImage: resolveScenarioImage(
-            nextScenario.settings?.location_image_url
-          ),
+          locationName: nextScenario.settings?.locationName || "Canteen",
+          locationImage: resolveScenarioImage(nextScenario.settings?.locationImageUrl),
           objectives: Array.isArray(nextScenario.objectives)
             ? nextScenario.objectives
                 .map(
@@ -139,8 +142,8 @@ const MainSettings = () => {
                 )
                 .join("\n")
             : "",
-          backgroundNoise: Number(nextScenario.settings?.background_noise ?? 20),
-          aiPersonality: nextScenario.settings?.ai_personality_prompt || "",
+          backgroundNoise: Number(nextScenario.settings?.backgroundNoise ?? 20),
+          aiPersonality: nextScenario.settings?.aiPersonalityPrompt || "",
           contingencies: nextScenario.settings?.contingencies || "",
         });
       } catch {
@@ -186,6 +189,7 @@ const MainSettings = () => {
         await api.updateCaregiverScenarioSettings(scenarioId, {
           locationName: formData.locationName,
           locationImageUrl: formData.locationImage,
+          objectives: parseObjectivesInput(formData.objectives),
           backgroundNoise: Number(formData.backgroundNoise),
           aiPersonalityPrompt: formData.aiPersonality,
           contingencies: formData.contingencies,

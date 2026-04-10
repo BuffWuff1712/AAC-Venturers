@@ -1,14 +1,16 @@
 import { Router } from "express";
 import { db } from "../db/database.js";
 import { getAnalyticsSummary } from "../services/orchestration/sessionTracker.js";
+import {
+  buildDefaultScenarioSettings,
+  mergeObjectives,
+  mergeScenarioSettings,
+  normalizeObjectiveDescriptions,
+} from "../data/scenarioDefaults.js";
 
 export const caregiverRoutes = Router();
 
 function mapScenarioSettings(settings) {
-  if (!settings) {
-    return null;
-  }
-
   return {
     settingsId: settings.settings_id,
     scenarioId: settings.scenario_id,
@@ -29,6 +31,27 @@ function mapObjective(objective) {
     position: objective.position,
     isRequired: Boolean(objective.is_required),
   };
+}
+
+function loadScenarioSettingsWithDefaults(scenario) {
+  const storedSettings =
+    db.prepare("SELECT * FROM scenario_settings WHERE scenario_id = ?").get(scenario.scenario_id) || {};
+
+  return mergeScenarioSettings(
+    storedSettings,
+    buildDefaultScenarioSettings({
+      scenarioId: scenario.scenario_id,
+      title: scenario.title,
+    }),
+  );
+}
+
+function loadScenarioObjectivesWithDefaults(scenarioId) {
+  const storedObjectives = db
+    .prepare("SELECT * FROM objectives WHERE scenario_id = ? ORDER BY position")
+    .all(scenarioId);
+
+  return mergeObjectives(storedObjectives, scenarioId);
 }
 
 function mapScenarioHistorySession(session) {
@@ -58,12 +81,25 @@ caregiverRoutes.get("/scenarios", (req, res) => {
       .all();
 
     res.json(
-      scenarios.map((scenario) => ({
-        scenarioId: scenario.scenario_id,
-        title: scenario.title,
-        locationName: scenario.location_name,
-        isActive: Boolean(scenario.is_active),
-      })),
+      scenarios.map((scenario) => {
+        const settings = mergeScenarioSettings(
+          {
+            scenario_id: scenario.scenario_id,
+            location_name: scenario.location_name,
+          },
+          buildDefaultScenarioSettings({
+            scenarioId: scenario.scenario_id,
+            title: scenario.title,
+          }),
+        );
+
+        return {
+          scenarioId: scenario.scenario_id,
+          title: scenario.title,
+          locationName: settings.location_name,
+          isActive: Boolean(scenario.is_active),
+        };
+      }),
     );
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch scenarios", error: error.message });
@@ -81,13 +117,8 @@ caregiverRoutes.get("/scenarios/:scenarioId", (req, res) => {
       return res.status(404).json({ message: "Scenario not found" });
     }
 
-    const settings = db
-      .prepare("SELECT * FROM scenario_settings WHERE scenario_id = ?")
-      .get(req.params.scenarioId);
-
-    const objectives = db
-      .prepare("SELECT * FROM objectives WHERE scenario_id = ? ORDER BY position")
-      .all(req.params.scenarioId);
+    const settings = loadScenarioSettingsWithDefaults(scenario);
+    const objectives = loadScenarioObjectivesWithDefaults(req.params.scenarioId);
 
     res.json({
       scenario: {
@@ -106,61 +137,99 @@ caregiverRoutes.get("/scenarios/:scenarioId", (req, res) => {
 // Update scenario settings
 caregiverRoutes.put("/scenarios/:scenarioId/settings", (req, res) => {
   try {
-    const { locationName, locationImageUrl, backgroundNoise, aiPersonalityPrompt, contingencies } = req.body;
+    const {
+      locationName,
+      locationImageUrl,
+      backgroundNoise,
+      aiPersonalityPrompt,
+      contingencies,
+      objectives = [],
+    } = req.body;
     const scenarioId = req.params.scenarioId;
 
     const scenario = db
-      .prepare("SELECT scenario_id FROM scenarios WHERE scenario_id = ?")
+      .prepare("SELECT scenario_id, title FROM scenarios WHERE scenario_id = ?")
       .get(scenarioId);
 
     if (!scenario) {
       return res.status(404).json({ message: "Scenario not found" });
     }
 
-    const existingSettings = db
-      .prepare("SELECT settings_id FROM scenario_settings WHERE scenario_id = ?")
-      .get(scenarioId);
+    const objectiveDescriptions = normalizeObjectiveDescriptions(objectives);
 
-    if (existingSettings) {
-      db.prepare(`
-        UPDATE scenario_settings
-        SET location_name = ?, location_image_url = ?, background_noise = ?,
-            ai_personality_prompt = ?, contingencies = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE scenario_id = ?
-      `).run(
-        locationName,
-        locationImageUrl,
-        backgroundNoise,
-        aiPersonalityPrompt,
-        contingencies,
-        scenarioId,
-      );
-    } else {
-      const settingsId = `settings-${scenarioId}`;
-      db.prepare(`
-        INSERT INTO scenario_settings (
-          settings_id, scenario_id, location_name, location_image_url,
-          background_noise, ai_personality_prompt, contingencies
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        settingsId,
-        scenarioId,
-        locationName,
-        locationImageUrl,
-        backgroundNoise,
-        aiPersonalityPrompt,
-        contingencies,
-      );
-    }
+    const saveScenarioSettings = db.transaction(() => {
+      const existingSettings = db
+        .prepare("SELECT settings_id FROM scenario_settings WHERE scenario_id = ?")
+        .get(scenarioId);
 
-    const savedSettings = db
-      .prepare("SELECT * FROM scenario_settings WHERE scenario_id = ?")
-      .get(scenarioId);
+      if (existingSettings) {
+        db.prepare(`
+          UPDATE scenario_settings
+          SET location_name = ?, location_image_url = ?, background_noise = ?,
+              ai_personality_prompt = ?, contingencies = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE scenario_id = ?
+        `).run(
+          locationName,
+          locationImageUrl,
+          backgroundNoise,
+          aiPersonalityPrompt,
+          contingencies,
+          scenarioId,
+        );
+      } else {
+        const settingsId = `settings-${scenarioId}`;
+        db.prepare(`
+          INSERT INTO scenario_settings (
+            settings_id, scenario_id, location_name, location_image_url,
+            background_noise, ai_personality_prompt, contingencies
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          settingsId,
+          scenarioId,
+          locationName,
+          locationImageUrl,
+          backgroundNoise,
+          aiPersonalityPrompt,
+          contingencies,
+        );
+      }
+
+      db.prepare("DELETE FROM objectives WHERE scenario_id = ?").run(scenarioId);
+
+      if (objectiveDescriptions.length) {
+        const insertObjective = db.prepare(`
+          INSERT INTO objectives (objective_id, scenario_id, description, position, is_required)
+          VALUES (?, ?, ?, ?, ?)
+        `);
+
+        objectiveDescriptions.forEach((description, index) => {
+          insertObjective.run(
+            `${scenarioId}-objective-${index + 1}`,
+            scenarioId,
+            description,
+            index + 1,
+            1,
+          );
+        });
+      }
+    });
+
+    saveScenarioSettings();
+
+    const savedSettings = mergeScenarioSettings(
+      db.prepare("SELECT * FROM scenario_settings WHERE scenario_id = ?").get(scenarioId) || {},
+      buildDefaultScenarioSettings({
+        scenarioId,
+        title: scenario.title,
+      }),
+    );
+    const savedObjectives = loadScenarioObjectivesWithDefaults(scenarioId);
 
     res.json({
       message: "Settings updated successfully",
       settings: mapScenarioSettings(savedSettings),
+      objectives: savedObjectives.map(mapObjective),
     });
   } catch (error) {
     res.status(500).json({ message: "Failed to update settings", error: error.message });

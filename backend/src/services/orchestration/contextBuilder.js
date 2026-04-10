@@ -1,6 +1,12 @@
 import { db } from "../../db/database.js";
 import { childId as seededChildId } from "../../data/seedData.js";
 import { westernStallMenu } from "../../data/menuCatalog.js";
+import {
+  buildDefaultScenarioSettings,
+  buildObjectiveText,
+  mergeObjectives,
+  mergeScenarioSettings,
+} from "../../data/scenarioDefaults.js";
 
 function inferPersonality(aiPrompt = "") {
   const normalized = String(aiPrompt || "").toLowerCase();
@@ -70,15 +76,20 @@ export function loadScenarioContext(scenarioId) {
     throw new Error("Scenario not found");
   }
 
-  const settings = db
+  const storedSettings = db
     .prepare("SELECT * FROM scenario_settings WHERE scenario_id = ?")
     .get(scenarioId) || {};
 
-  const objectives = db
+  const storedObjectives = db
     .prepare("SELECT * FROM objectives WHERE scenario_id = ? ORDER BY position")
     .all(scenarioId);
 
-  const objectiveText = objectives.map((objective) => objective.description).join(" Then ");
+  const settings = mergeScenarioSettings(
+    storedSettings,
+    buildDefaultScenarioSettings({ scenarioId, title: scenario.title }),
+  );
+  const objectives = mergeObjectives(storedObjectives, scenarioId);
+  const objectiveText = buildObjectiveText(objectives);
 
   return {
     scenario: {
@@ -89,7 +100,7 @@ export function loadScenarioContext(scenarioId) {
       title: scenario.title,
       description:
         settings.location_name || "Child practises ordering from a western food stall during recess.",
-      objective: objectiveText || "Order food and complete the purchase interaction.",
+      objective: objectiveText,
       personality: inferPersonality(settings.ai_personality_prompt),
       memoryEnabled: inferMemoryEnabled(settings.ai_personality_prompt, settings.contingencies),
       locationName: settings.location_name || scenario.title,
