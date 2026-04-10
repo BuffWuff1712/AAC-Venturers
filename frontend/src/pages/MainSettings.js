@@ -57,6 +57,22 @@ const fallbackScenario = {
   ],
 };
 
+const FALLBACK_LOCATION_IMAGE = "/images/canteen.jpg";
+
+function resolveScenarioImage(locationImage) {
+  if (typeof locationImage !== "string") {
+    return FALLBACK_LOCATION_IMAGE;
+  }
+
+  const normalizedImage = locationImage.trim();
+
+  if (!normalizedImage || normalizedImage === "/images/western-stall.jpg") {
+    return FALLBACK_LOCATION_IMAGE;
+  }
+
+  return normalizedImage;
+}
+
 const MainSettings = () => {
   const router = useRouter();
   const { scenarioId, scenarioTitle } = router.query;
@@ -70,7 +86,7 @@ const MainSettings = () => {
   });
   const [formData, setFormData] = useState({
     locationName: "Canteen",
-    locationImage: "/images/canteen.jpg",
+    locationImage: FALLBACK_LOCATION_IMAGE,
     objectives: "",
     backgroundNoise: 20,
     aiPersonality:
@@ -91,7 +107,9 @@ const MainSettings = () => {
         setLoadedScenario(fallbackScenario);
         setFormData({
           locationName: fallbackScenario.settings.location_name,
-          locationImage: fallbackScenario.settings.location_image_url,
+          locationImage: resolveScenarioImage(
+            fallbackScenario.settings.location_image_url
+          ),
           objectives: fallbackScenario.objectives
             .map((objective, index) => `${index + 1}. ${objective.description}`)
             .join("\n"),
@@ -110,8 +128,9 @@ const MainSettings = () => {
         setLoadedScenario(nextScenario);
         setFormData({
           locationName: nextScenario.settings?.location_name || "Canteen",
-          locationImage:
-            nextScenario.settings?.location_image_url || "/images/canteen.jpg",
+          locationImage: resolveScenarioImage(
+            nextScenario.settings?.location_image_url
+          ),
           objectives: Array.isArray(nextScenario.objectives)
             ? nextScenario.objectives
                 .map(

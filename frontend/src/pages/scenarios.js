@@ -14,6 +14,21 @@ const fallbackScenarios = [
 ];
 
 const lockedScenarioNames = ["Library", "Playground"];
+const FALLBACK_LOCATION_IMAGE = "/images/canteen.jpg";
+
+function resolveScenarioImage(locationImage) {
+  if (typeof locationImage !== "string") {
+    return FALLBACK_LOCATION_IMAGE;
+  }
+
+  const normalizedImage = locationImage.trim();
+
+  if (!normalizedImage || normalizedImage === "/images/western-stall.jpg") {
+    return FALLBACK_LOCATION_IMAGE;
+  }
+
+  return normalizedImage;
+}
 
 const ScenariosPage = () => {
   const router = useRouter();
@@ -48,7 +63,7 @@ const ScenariosPage = () => {
         scenarioId: scenario.scenarioId,
         title: scenario.title || "Canteen",
         locationName: scenario.locationName || scenario.title || "School Canteen",
-        locationImage: scenario.locationImage || "/images/canteen.jpg",
+        locationImage: resolveScenarioImage(scenario.locationImage),
         description: "Learn how to greet a friend and start a conversation!",
       }));
     }

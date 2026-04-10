@@ -1,0 +1,87 @@
+import { generateScenarioReply } from "./llmService.js";
+
+/**
+ * Returns a deterministic reply for fast, factual actions where LLM creativity is not needed.
+ */
+function buildDeterministicResponse({
+  context,
+  childMemory,
+  action,
+  selectedMenu,
+  customizations = [],
+  interpretation,
+}) {
+  const itemName = selectedMenu?.name || "";
+  const visibleCustomizations = customizations.filter((value) => value !== "no customisations");
+  const customizationText = visibleCustomizations.length
+    ? ` with ${visibleCustomizations.join(", ")}`
+    : "";
+  const availableOptions = (selectedMenu?.customizations || [])
+    .filter(Boolean)
+    .join(", ");
+
+  const deterministicMessages = {
+    list_menu: `We have ${context.menu.map((item) => item.name).join(", ")}. What would you like?`,
+    confirm_order: `Okay! ${itemName || "Your order"}${customizationText}. Is that correct?`,
+    request_payment: `Please pay when ready for ${itemName || "your order"}. You can say "I paid" after that.`,
+    end: `Great job ordering ${itemName || "your food"}! Here is your food. Enjoy your recess!`,
+    ask_customization: interpretation?.asksCustomizationOptions
+      ? `For ${itemName || "that"}, you can choose ${availableOptions || "no customisations"}.`
+      : `Any changes for ${itemName || "that"}? You can also say no customisations.`,
+    suggest_usual: `Welcome back! Do you want your usual ${childMemory?.favouriteOrder || itemName || "order"}?`,
+    follow_up: "No problem. What would you like to change?",
+  };
+
+  if (!deterministicMessages[action]) {
+    return null;
+  }
+
+  return {
+    action,
+    message: deterministicMessages[action],
+    hintUsed: false,
+    orderSummary: {
+      item: itemName,
+      customizations,
+    },
+    source: "deterministic",
+  };
+}
+
+/**
+ * Thin wrapper that keeps response wording generation separate from policy and state logic.
+ */
+export async function generateResponse({
+  context,
+  childMemory,
+  action,
+  userInput,
+  session,
+  selectedMenu,
+  customizations,
+  interpretation,
+}) {
+  const deterministicResponse = buildDeterministicResponse({
+    context,
+    childMemory,
+    action,
+    selectedMenu,
+    customizations,
+    interpretation,
+  });
+
+  if (deterministicResponse) {
+    return deterministicResponse;
+  }
+
+  return generateScenarioReply({
+    context,
+    childMemory,
+    action,
+    userInput,
+    session,
+    selectedMenu,
+    customizations,
+    interpretation,
+  });
+}

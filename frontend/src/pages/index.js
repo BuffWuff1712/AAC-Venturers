@@ -12,6 +12,7 @@ const Home = () => {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [childName, setChildName] = useState("");
 
   const handleCaregiverLogin = async (e) => {
     e.preventDefault();
@@ -157,9 +158,29 @@ const Home = () => {
                 {successMessage}
               </h2>
 
+              {successMessage.includes("Venturer") ? (
+                <div className="mb-6 text-left">
+                  <label
+                    htmlFor="child-name"
+                    className="mb-3 block text-lg font-black text-text-brown"
+                  >
+                    What&apos;s your name?
+                  </label>
+                  <input
+                    id="child-name"
+                    type="text"
+                    value={childName}
+                    onChange={(e) => setChildName(e.target.value)}
+                    placeholder="Type your name here"
+                    className="w-full rounded-3xl border-4 border-child-green/40 bg-[#FFF9F5] px-5 py-4 text-xl font-bold text-text-brown outline-none transition-all focus:border-child-green"
+                  />
+                </div>
+              ) : null}
+
               <button
                 onClick={() => {
                   if (successMessage.includes("Venturer")) {
+                    localStorage.setItem("childDisplayName", childName.trim());
                     router.push("/scenarios");
                     return;
                   }

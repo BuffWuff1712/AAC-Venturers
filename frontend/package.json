@@ -1,11 +1,11 @@
 {
-  "name": "aac-venturers",
-  "version": "0.1.0",
+  "name": "aac-venturers-frontend",
   "private": true,
+  "version": "0.1.0",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 5173",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 5173",
     "lint": "eslint"
   },
   "dependencies": {
