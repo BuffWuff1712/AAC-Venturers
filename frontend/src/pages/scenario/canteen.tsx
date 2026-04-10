@@ -1,84 +1,44 @@
-// ─── pages/scenario/canteen.tsx ──────────────────────────────────────────────
-// The main "Talking to a Friend" canteen scenario.
-// Orchestrates step flow, auto-recording, transcript accumulation, and
-// session analytics, then passes results to the completion page.
-
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Image from "next/image";
-
-// ── Sub-components
 import InstructionBanner from "@/components/scenario/InstructionBanner";
 import CharacterStage from "@/components/scenario/CharacterStage";
 import TranscriptPanel from "@/components/scenario/TranscriptPanel";
 import RecordingIndicator from "@/components/scenario/RecordingIndicator";
 import AchievementBanner from "@/components/scenario/AchievementBanner";
+import { api, getStoredUser, saveAuthSession } from "@/api/client";
+import { PromptAnalytic, SessionResult, TranscriptEntry } from "../../types/scenario";
 
-// ── Types
-import {
-  ScenarioStep,
-  TranscriptEntry,
-  PromptAnalytic,
-  SessionResult,
-} from "../../types/scenario";
+const DEFAULT_SCENARIO_ID = "scenario-001";
+const FALLBACK_TITLE = "Canteen";
+const FALLBACK_OBJECTIVE =
+  "Order at least one menu item clearly Then Complete the purchase interaction";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Scenario definition: 4 steps matching the spec
-// ─────────────────────────────────────────────────────────────────────────────
-const STEPS: ScenarioStep[] = [
-  {
-    id: 1,
-    instruction: "Say hello to your friend.",
-    characterSpeech: "Hi!",
-    waitForChild: true,
-  },
-  {
-    id: 2,
-    instruction: "Great! Now ask your friend how they are.",
-    characterSpeech: undefined, // Friend waits after child said hi
-    waitForChild: true,
-  },
-  {
-    id: 3,
-    instruction: "Listen to your friend's answer.",
-    characterSpeech: "I'm good! How about you?",
-    waitForChild: false,
-    autoAdvanceAfterMs: 3_000,
-  },
-  {
-    id: 4,
-    instruction: "Tell your friend how you are!",
-    characterSpeech: undefined,
-    waitForChild: true,
-  },
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Component
-// ─────────────────────────────────────────────────────────────────────────────
 const CanteenScenario: React.FC = () => {
   const router = useRouter();
-
-  // ── State ──────────────────────────────────────────────────────────────────
-  const [stepIndex, setStepIndex] = useState(0);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [analytics, setAnalytics] = useState<PromptAnalytic[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [countdown, setCountdown] = useState(30);
-  // const [showStuckHelper, setShowStuckHelper] = useState(false);
   const [showAchievement, setShowAchievement] = useState(false);
   const [scenarioDone, setScenarioDone] = useState(false);
+  const [sessionId, setSessionId] = useState("");
+  const [scenarioTitle, setScenarioTitle] = useState(FALLBACK_TITLE);
+  const [scenarioObjective, setScenarioObjective] = useState(FALLBACK_OBJECTIVE);
+  const [characterSpeech, setCharacterSpeech] = useState("Starting session...");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  // Track when the current child-prompt started (for response-time analytics)
   const promptStartRef = useRef<number>(Date.now());
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const currentStep = STEPS[stepIndex];
-  const totalSteps = STEPS.length;
+  const totalSteps = 4;
+  const currentStep = Math.min(
+    transcript.filter((entry) => entry.speaker === "child").length + 1,
+    totalSteps
+  );
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  // Add a line to the transcript log
   const addEntry = useCallback(
     (speaker: TranscriptEntry["speaker"], label: string, text: string) => {
       setTranscript((prev) => [
@@ -89,210 +49,285 @@ const CanteenScenario: React.FC = () => {
     []
   );
 
-  // Start the 30-second countdown display
   const startCountdown = useCallback(() => {
     setCountdown(30);
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+
     countdownIntervalRef.current = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
+      setCountdown((value) => {
+        if (value <= 1) {
           clearInterval(countdownIntervalRef.current!);
           return 0;
         }
-        return c - 1;
+
+        return value - 1;
       });
-    }, 1_000);
+    }, 1000);
   }, []);
 
   const stopCountdown = useCallback(() => {
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
   }, []);
 
-  // ── Step transitions ───────────────────────────────────────────────────────
+  const prepareChildUser = useCallback(async () => {
+    const storedUser = getStoredUser();
 
-  const advanceStep = useCallback(() => {
-    stopCountdown();
-    // setShowStuckHelper(false);
-    setIsRecording(false);
-
-    if (stepIndex + 1 >= totalSteps) {
-      // Scenario complete
-      setScenarioDone(true);
-      // Check achievement: total response time < 10 s across all child steps
-      const totalMs = analytics.reduce((a, b) => a + b.responseTimeMs, 0);
-      if (totalMs < 10_000) setShowAchievement(true);
-      return;
+    if (storedUser?.childId) {
+      return storedUser;
     }
 
-    setStepIndex((i) => i + 1);
-  }, [stepIndex, totalSteps, analytics, stopCountdown]);
+    const payload = await api.login({ role: "child" });
+    saveAuthSession(payload);
+    return payload.user;
+  }, []);
 
-  // ── Handle child's speech transcript ─────────────────────────────────────
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    let isMounted = true;
+
+    const startScenario = async () => {
+      setIsLoadingSession(true);
+      setErrorMessage("");
+
+      try {
+        const childUser = await prepareChildUser();
+        const scenarioId =
+          typeof router.query.scenarioId === "string" && router.query.scenarioId
+            ? router.query.scenarioId
+            : DEFAULT_SCENARIO_ID;
+
+        const response = await api.startChildSession({
+          scenarioId,
+          childId: childUser.childId,
+        });
+
+        if (!isMounted) return;
+
+        const openingMessage = Array.isArray(response.messages)
+          ? response.messages[0]
+          : null;
+
+        setSessionId(response.sessionId || "");
+        setScenarioTitle(response.scenario?.title || FALLBACK_TITLE);
+        setScenarioObjective(response.scenario?.objective || FALLBACK_OBJECTIVE);
+        setCharacterSpeech(
+          openingMessage?.message || "Hi there! What would you like today?"
+        );
+
+        if (openingMessage?.message) {
+          addEntry("friend", "Stall Owner", openingMessage.message);
+        }
+
+        promptStartRef.current = Date.now();
+        setIsRecording(true);
+        startCountdown();
+      } catch (err) {
+        if (!isMounted) return;
+
+        setErrorMessage(err instanceof Error ? err.message : "Unable to start the scenario.");
+        setCharacterSpeech("We couldn't start the conversation just yet.");
+        setIsRecording(false);
+      } finally {
+        if (isMounted) {
+          setIsLoadingSession(false);
+        }
+      }
+    };
+
+    startScenario();
+
+    return () => {
+      isMounted = false;
+      stopCountdown();
+    };
+  }, [addEntry, prepareChildUser, router.isReady, router.query.scenarioId, startCountdown, stopCountdown]);
 
   const handleTranscript = useCallback(
-    (text: string) => {
+    async (text: string) => {
+      if (!sessionId || isSubmitting || scenarioDone) {
+        return;
+      }
+
+      setIsSubmitting(true);
+      setErrorMessage("");
+      setIsRecording(false);
       stopCountdown();
-      // setShowStuckHelper(false);
 
       const responseMs = Date.now() - promptStartRef.current;
-
-      // Map step id → readable analytics label
-      const LABELS: Record<number, string> = {
-        1: "Greeting response",
-        2: "Question response",
-        4: "Final response",
-      };
-
-      setAnalytics((prev) => [
-        ...prev,
-        {
-          stepId: currentStep.id,
-          label: LABELS[currentStep.id] ?? `Step ${currentStep.id} response`,
-          responseTimeMs: responseMs,
-          // hintsUsed: showStuckHelper ? 1 : 0,
-          hintsUsed: 0, // For simplicity, not tracking hints in this version
-        },
-      ]);
+      const childTurnNumber =
+        transcript.filter((entry) => entry.speaker === "child").length + 1;
 
       addEntry("child", "You", text);
 
-      // Advance to the next scripted turn.
-      setTimeout(advanceStep, 600);
+      try {
+        const response = await api.sendChildMessage(sessionId, {
+          input: text,
+          inputMode: "text",
+        });
+
+        const nextAnalytic: PromptAnalytic = {
+          stepId: childTurnNumber,
+          label: `Turn ${childTurnNumber} response`,
+          responseTimeMs: responseMs,
+          hintsUsed: 0,
+        };
+
+        setAnalytics((prev) => [...prev, nextAnalytic]);
+
+        if (response?.message) {
+          addEntry("friend", "Stall Owner", response.message);
+          setCharacterSpeech(response.message);
+        }
+
+        if (response?.status === "completed") {
+          const totalMs = analytics.reduce(
+            (sum, item) => sum + item.responseTimeMs,
+            responseMs
+          );
+
+          if (totalMs < 10000) {
+            setShowAchievement(true);
+          }
+
+          const result: SessionResult = {
+            scenarioId:
+              typeof router.query.scenarioId === "string"
+                ? router.query.scenarioId
+                : DEFAULT_SCENARIO_ID,
+            scenarioTitle,
+            transcript: [
+              ...transcript,
+              { speaker: "child", label: "You", text, timestamp: Date.now() },
+              ...(response?.message
+                ? [
+                    {
+                      speaker: "friend" as const,
+                      label: "Stall Owner",
+                      text: response.message,
+                      timestamp: Date.now(),
+                    },
+                  ]
+                : []),
+            ],
+            analytics: [...analytics, nextAnalytic],
+            totalSteps,
+            completedSteps: totalSteps,
+            totalResponseTimeMs: totalMs,
+          };
+
+          stopCountdown();
+          setIsRecording(false);
+          setScenarioDone(true);
+
+          setTimeout(() => {
+            router.push({
+              pathname: "/celebration",
+              query: {
+                result: JSON.stringify(result),
+                from: "canteen",
+                sessionId,
+              },
+            });
+          }, totalMs < 10000 ? 4500 : 1000);
+
+          return;
+        }
+
+        promptStartRef.current = Date.now();
+        setIsRecording(true);
+        startCountdown();
+      } catch (err) {
+        setErrorMessage(
+          err instanceof Error ? err.message : "Unable to send your response."
+        );
+        setIsRecording(true);
+        startCountdown();
+      } finally {
+        setIsSubmitting(false);
+      }
     },
-    [currentStep, addEntry, advanceStep, stopCountdown]
+    [
+      addEntry,
+      analytics,
+      isSubmitting,
+      router,
+      scenarioDone,
+      scenarioTitle,
+      sessionId,
+      startCountdown,
+      stopCountdown,
+      totalSteps,
+      transcript,
+    ]
   );
 
-  // ── Stuck helper: activated after 30 s silence ─────────────────────────────
-
-  // const handleNoSpeech = useCallback(() => {
-  //   setShowStuckHelper(true);
-  // }, []);
-
-  // ── Step entry effect: fires every time stepIndex changes ─────────────────
-
   useEffect(() => {
-    const step = STEPS[stepIndex];
-    promptStartRef.current = Date.now();
-
-    // If the character speaks, add to transcript
-    if (step.characterSpeech) {
-      addEntry("friend", "Friend", step.characterSpeech);
-    }
-
-    if (step.waitForChild) {
-      // Start recording and countdown for child-response steps
-      setIsRecording(true);
-      startCountdown();
-    } else {
-      setIsRecording(false);
+    return () => {
       stopCountdown();
+    };
+  }, [stopCountdown]);
+
+  const instructionText = useMemo(() => {
+    if (errorMessage) {
+      return errorMessage;
     }
 
-    // Auto-advance steps that don't need child input
-    if (!step.waitForChild && step.autoAdvanceAfterMs) {
-      const t = setTimeout(advanceStep, step.autoAdvanceAfterMs);
-      return () => clearTimeout(t);
+    if (isLoadingSession) {
+      return "Setting up your practice session...";
     }
-  }, [stepIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Navigate to completion page once scenario ends ────────────────────────
+    return scenarioObjective || "Listen carefully and respond to the stall owner.";
+  }, [errorMessage, isLoadingSession, scenarioObjective]);
 
-  useEffect(() => {
-    if (!scenarioDone) return;
-    // Wait for achievement banner to play, then navigate
-    const delay = showAchievement ? 4_500 : 1_000;
-    const t = setTimeout(() => {
-      const result: SessionResult = {
-        scenarioId: "canteen",
-        scenarioTitle: "Talking to a Friend – Canteen",
-        transcript,
-        analytics,
-        totalSteps,
-        completedSteps: totalSteps,
-        totalResponseTimeMs: analytics.reduce((a, b) => a + b.responseTimeMs, 0),
-      };
-      // Pass result as query param (JSON-encoded); real apps would use state management
-      router.push({
-        pathname: "/celebration",
-        query: {
-          result: JSON.stringify(result),
-          from: "canteen" // This helps the 'Try Again' button find this file
-        },
-      });
-    }, delay);
-    return () => clearTimeout(t);
-  }, [scenarioDone]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="relative w-screen h-screen overflow-hidden font-fredoka">
-
-      {/* ── Background image (squashed to fill, slightly transparent) ──────── */}
+    <div className="relative h-screen w-screen overflow-hidden font-fredoka">
       <div className="absolute inset-0 z-0">
         <Image
           src="/images/canteen_bg.png "
           alt="School canteen"
           fill
-          className="object-fill opacity-60"  // opacity-60 = slightly transparent
+          className="object-fill opacity-60"
           priority
         />
-        {/* Extra overlay so characters and labels pop */}
         <div className="absolute inset-0 bg-white/20" />
       </div>
 
-      {/* ── Achievement banner (fixed, auto-fades) ───────────────────────────── */}
       <AchievementBanner
         show={showAchievement}
         achievementName="Quick Responder"
-        durationMs={4_000}
+        durationMs={4000}
       />
 
-      {/* ── Main layout: column filling the viewport ─────────────────────────── */}
-      <div className="relative z-10 flex flex-col h-full p-4 gap-3">
-
-        {/* TOP: instruction banner */}
+      <div className="relative z-10 flex h-full flex-col gap-3 p-4">
         <InstructionBanner
-          currentStep={stepIndex + 1}
+          currentStep={currentStep}
           totalSteps={totalSteps}
-          instruction={currentStep.instruction}
-          timeRemaining={currentStep.waitForChild ? countdown : undefined}
+          instruction={instructionText}
+          timeRemaining={isRecording ? countdown : undefined}
         />
 
-        {/* MIDDLE: character stage – takes all remaining space */}
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex flex-1 items-center justify-center">
           <CharacterStage
-            characterImage="/images/student.png"   // placeholder
-            characterName="Friend"
-            speech={currentStep.characterSpeech}
+            characterImage="/images/student.png"
+            characterName={scenarioTitle}
+            speech={characterSpeech}
             isListening={isRecording}
           />
         </div>
 
-        {/* STUCK HELPER: gentle prompt that floats above the transcript */}
-        {/* {showStuckHelper && (
-          <div className="mx-auto bg-yellow-400 rounded-2xl px-6 py-3 text-text-brown font-black text-lg shadow-lg animate-bounce">
-            💡 Try saying: "
-            {stepIndex === 0 ? "Hi!" : stepIndex === 1 ? "How are you?" : "I'm good!"}
-            "
-          </div>
-        )} */}
-
-        {/* BOTTOM: recording indicator + transcript */}
         <div className="flex flex-col gap-2">
-          {/* Recording controls row */}
           <div className="flex justify-center">
             <RecordingIndicator
-              isRecording={isRecording}
+              isRecording={isRecording && !scenarioDone && !isLoadingSession}
               onTranscript={handleTranscript}
               onStop={() => {
                 setIsRecording(false);
                 stopCountdown();
               }}
-            // onNoSpeech={handleNoSpeech}
             />
           </div>
 
-          {/* Conversation log */}
           <TranscriptPanel entries={transcript} />
         </div>
       </div>
