@@ -15,31 +15,109 @@ const Home = () => {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  // ── MOCK CAREGIVER LOGIN ──────────────────────────────────────────
-  const handleCaregiverLogin = (e) => {
-    e.preventDefault();
-    setError("");
+  // // ── MOCK CAREGIVER LOGIN ──────────────────────────────────────────
+  // const handleCaregiverLogin = (e) => {
+  //   e.preventDefault();
+  //   setError("");
 
-    // Matches the credentials your team requested
-    if (email === "teacher@example.com" && password === "demo123") {
-      // Simulate saving a session token
-      localStorage.setItem("token", "demo-session-token");
-      localStorage.setItem("userRole", "caregiver");
+  //   // Matches the credentials your team requested
+  //   if (email === "teacher@example.com" && password === "demo123") {
+  //     // Simulate saving a session token
+  //     localStorage.setItem("token", "demo-session-token");
+  //     localStorage.setItem("userRole", "caregiver");
 
-      setIsModalOpen(false);
-      setSuccessMessage("Access Granted!");
-    } else {
-      setError("Invalid email or password. Hint: teacher@example.com / demo123");
+  //     setIsModalOpen(false);
+  //     setSuccessMessage("Access Granted!");
+  //   } else {
+  //     setError("Invalid email or password. Hint: teacher@example.com / demo123");
+  //   }
+  // };
+
+  // ── CAREGIVER LOGIN ──────────────────────────────────────────
+  const handleCaregiverLogin = async (e) => {
+  e.preventDefault();
+  setError("");
+  setSuccessMessage("");
+
+  try {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        role: "caregiver",
+        email: email,
+        password: password,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      // API returned error (e.g. wrong credentials)
+      throw new Error(data.message || "Login failed");
     }
-  };
 
-  // ── MOCK CHILD LOGIN ──────────────────────────────────────────────
-  const handleChildClick = () => {
-    // Simulate child session
-    localStorage.setItem("token", "demo-session-token");
-    localStorage.setItem("userRole", "child");
+    // ✅ Save session data from API response
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("userRole", data.user.role);
+    localStorage.setItem("userId", data.user.userId);
+    localStorage.setItem("caregiverId", data.user.caregiverId);
+
+    setIsModalOpen(false);
+    setSuccessMessage("Access Granted!");
+
+  } catch (err) {
+    setError(err.message || "Something went wrong. Please try again.");
+  }
+};
+
+  // // ── MOCK CHILD LOGIN ──────────────────────────────────────────────
+  // const handleChildClick = () => {
+  //   // Simulate child session
+  //   localStorage.setItem("token", "demo-session-token");
+  //   localStorage.setItem("userRole", "child");
+  //   setSuccessMessage("Welcome AAC-Venturer!");
+  // };
+
+  // ── CHILD LOGIN ──────────────────────────────────────────
+  const handleChildClick = async (e) => {
+  e.preventDefault();
+  setError("");
+  setSuccessMessage("");
+
+  try {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        role: "child",
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      // API returned error (e.g. wrong credentials)
+      throw new Error(data.message || "Login failed");
+    }
+
+    // ✅ Save session data from API response
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("userRole", data.user.role);
+    localStorage.setItem("userId", data.user.userId);
+    localStorage.setItem("caregiverId", data.user.childId);
+
+    setIsModalOpen(false);
     setSuccessMessage("Welcome AAC-Venturer!");
-  };
+
+  } catch (err) {
+    setError(err.message || "Something went wrong. Please try again.");
+  }
+};
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-page-peach p-4 font-fredoka">
