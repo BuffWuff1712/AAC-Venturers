@@ -13,29 +13,40 @@ import {
  */
 export function seedDatabase(db) {
   // Insert users
-  const insertUser = db.prepare(`
-    INSERT OR IGNORE INTO users (user_id, role)
+  const upsertUser = db.prepare(`
+    INSERT INTO users (user_id, role)
     VALUES (@user_id, @role)
+    ON CONFLICT(user_id) DO UPDATE SET
+      role = excluded.role
   `);
 
-  insertUser.run(caregiverUserSeed);
-  insertUser.run(childUserSeed);
+  upsertUser.run(caregiverUserSeed);
+  upsertUser.run(childUserSeed);
 
   // Insert caregivers
-  const insertCaregiver = db.prepare(`
-    INSERT OR IGNORE INTO caregivers (caregiver_id, user_id, email, password_hash)
+  const upsertCaregiver = db.prepare(`
+    INSERT INTO caregivers (caregiver_id, user_id, email, password_hash)
     VALUES (@caregiver_id, @user_id, @email, @password_hash)
+    ON CONFLICT(caregiver_id) DO UPDATE SET
+      user_id = excluded.user_id,
+      email = excluded.email,
+      password_hash = excluded.password_hash
   `);
 
-  insertCaregiver.run(caregiverSeed);
+  upsertCaregiver.run(caregiverSeed);
 
   // Insert children
-  const insertChild = db.prepare(`
-    INSERT OR IGNORE INTO children (child_id, user_id, caregiver_id, name, xp)
+  const upsertChild = db.prepare(`
+    INSERT INTO children (child_id, user_id, caregiver_id, name, xp)
     VALUES (@child_id, @user_id, @caregiver_id, @name, @xp)
+    ON CONFLICT(child_id) DO UPDATE SET
+      user_id = excluded.user_id,
+      caregiver_id = excluded.caregiver_id,
+      name = excluded.name,
+      xp = excluded.xp
   `);
 
-  insertChild.run(childSeed);
+  upsertChild.run(childSeed);
 
   // Insert scenarios
   const insertScenario = db.prepare(`
