@@ -29,6 +29,7 @@ const CanteenScenario: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isPaused, setIsPaused] = useState(false);
 
   const promptStartRef = useRef<number>(Date.now());
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -50,7 +51,7 @@ const CanteenScenario: React.FC = () => {
   );
 
   const startCountdown = useCallback(() => {
-    setCountdown(30);
+    // setCountdown(30);
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
 
     countdownIntervalRef.current = setInterval(() => {
@@ -121,6 +122,7 @@ const CanteenScenario: React.FC = () => {
 
         promptStartRef.current = Date.now();
         setIsRecording(true);
+        setCountdown(30);
         startCountdown();
       } catch (err) {
         if (!isMounted) return;
@@ -201,13 +203,13 @@ const CanteenScenario: React.FC = () => {
               { speaker: "child", label: "You", text, timestamp: Date.now() },
               ...(response?.message
                 ? [
-                    {
-                      speaker: "friend" as const,
-                      label: "Stall Owner",
-                      text: response.message,
-                      timestamp: Date.now(),
-                    },
-                  ]
+                  {
+                    speaker: "friend" as const,
+                    label: "Stall Owner",
+                    text: response.message,
+                    timestamp: Date.now(),
+                  },
+                ]
                 : []),
             ],
             analytics: [...analytics, nextAnalytic],
@@ -280,6 +282,26 @@ const CanteenScenario: React.FC = () => {
     return scenarioObjective || "Listen carefully and respond to the stall owner.";
   }, [errorMessage, isLoadingSession, scenarioObjective]);
 
+  const handleRestart = useCallback(() => {
+    // Clear everything
+    setTranscript([]);
+    setAnalytics([]);
+    setIsPaused(false);
+    setScenarioDone(false);
+    setErrorMessage("");
+
+    // Re-trigger the initial sequence
+    router.reload(); // Simplest way to restart a dynamic API-driven session
+  }, [router]);
+
+  const handleResume = useCallback(() => {
+    setIsPaused(false);
+    setIsRecording(true);
+    startCountdown();
+    promptStartRef.current = Date.now(); // Reset timer so child isn't penalized for the pause
+  }, [startCountdown]);
+
+
   return (
     <div className="relative h-screen w-screen overflow-hidden font-fredoka">
       <div className="absolute inset-0 z-0">
@@ -324,9 +346,46 @@ const CanteenScenario: React.FC = () => {
               onStop={() => {
                 setIsRecording(false);
                 stopCountdown();
+                setIsPaused(true); // Open the modal
               }}
             />
           </div>
+
+          {/* ─── NEW PAUSE MODAL UI ─────────────────────────────────────────────────── */}
+          {isPaused && (
+            <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
+              <div className="w-full max-w-sm rounded-[50px] bg-white p-10 shadow-2xl border-8 border-caregiver-peach animate-in zoom-in duration-300 text-center">
+
+                <div className="text-6xl mb-4">⏸️</div>
+                <h2 className="text-3xl font-black text-text-brown mb-2">Session Paused</h2>
+                <p className="text-lg font-medium text-gray-500 mb-8">What would you like to do?</p>
+
+                <div className="flex flex-col gap-4">
+                  <button
+                    onClick={handleResume}
+                    className="w-full bg-child-green hover:brightness-95 text-text-brown font-black py-4 rounded-3xl text-xl shadow-[0_6px_0_#92c45e] active:translate-y-1 active:shadow-none transition-all"
+                  >
+                    ▶️ Resume Session
+                  </button>
+
+                  <button
+                    onClick={handleRestart}
+                    className="w-full bg-white border-4 border-caregiver-peach text-text-brown font-black py-4 rounded-3xl text-xl hover:bg-orange-50 transition-all"
+                  >
+                    🔄 Start Over
+                  </button>
+
+                  <button
+                    onClick={() => router.push("/scenarios")}
+                    className="mt-2 text-gray-400 font-bold hover:text-red-500 transition-colors"
+                  >
+                    Quit Practice
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* ─────────────────────────────────────────────────────────────────────────── */}
 
           <TranscriptPanel entries={transcript} />
         </div>
