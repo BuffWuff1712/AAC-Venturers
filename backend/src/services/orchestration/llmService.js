@@ -56,6 +56,8 @@ function actionGuide(action) {
     small_talk: "Add a short friendly social remark while staying on task.",
     repeat: "Repeat the order or question clearly and simply.",
     rephrase: "Say the same thing again in simpler words.",
+    free_response:
+      "Reply naturally to the child's last message while gently keeping the conversation in the ordering scenario.",
 
     handle_silence:
       "Gently support the child if they stay silent for too long.",
@@ -120,6 +122,8 @@ Return JSON only with this shape:
   "asksHelp": false,
   "confused": false,
   "paymentDone": false,
+  "asksPaymentOptions": false,
+  "addOnRequested": false,
   "repeatRequested": false,
   "modelPhraseRequested": false,
   "unavailableRequest": false,
@@ -143,6 +147,8 @@ Rules:
 - Only use menu items from the menu list.
 - If the child is just saying yes after a suggested usual order, set affirmative=true.
 - If the child is declining customisations, set declineCustomization=true.
+- If payment is pending and the child is asking which payment methods are accepted, set asksPaymentOptions=true.
+- If the child is asking to add another item onto an existing order, set addOnRequested=true and set item to the added item.
 `;
 
   try {
@@ -224,6 +230,7 @@ Child memory: ${
 Last user input: ${userInput || "none"}
 Interpreted intent: ${interpretation?.intent || "unknown"}
 Interpreted confidence: ${interpretation?.confidence ?? "unknown"}
+Asked about payment modes: ${interpretation?.asksPaymentOptions ? "yes" : "no"}
 
 Rules:
 - Stay aligned with the current action.
@@ -234,8 +241,11 @@ Rules:
 - If action is "model_response" or "hint", provide a phrase the child can copy.
 - If action is "confirm_order", clearly restate item and customizations.
 - If action is "offer_add_on", suggest only one relevant add-on.
+- If action is "free_response", answer naturally, briefly, and stay in the canteen ordering context.
 - If action is "handle_unavailable", apologize briefly and suggest alternatives from the menu.
-- If action is "request_payment", ask for payment clearly and simply.
+- If action is "request_payment" and the child asked about payment modes, answer with the accepted payment methods clearly.
+- If action is "request_payment", otherwise ask for payment clearly and simply.
+- If action is "request_payment", include the current customizations or add-ons in the payable order summary when any exist.
 - If action is "end", sound warm and positive.
 
 Return valid JSON with this shape only:
@@ -275,7 +285,7 @@ function fallbackMessage(action, selectedMenu, customizations = [], childMemory)
     confirm_order:
       `Okay! ${itemName || "Your order"}${joinedCustomizations}. Is that correct?`,
     request_payment: 
-      `Please make payment for ${itemName|| "your order"}. Cash or card is okay.`,
+      `Please make payment for ${itemName|| "your order"}${joinedCustomizations}. Cash or card is okay.`,
     end: 
         `Great job ordering ${itemName || "your food"}! Here is your food. Enjoy your recess!`,
 
@@ -313,6 +323,8 @@ function fallbackMessage(action, selectedMenu, customizations = [], childMemory)
       `Let me say it again: ${itemName || "please tell me your order clearly"}.`,
     rephrase:
       "Sure, tell me the food item you want in a simple sentence.",
+    free_response:
+      "Okay, tell me a bit more and I will help you with your order.",
 
     handle_silence:
       "That is okay. Take your time. You can point or say the food name.",

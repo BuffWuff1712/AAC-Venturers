@@ -30,6 +30,46 @@ function saveStoredState(sessionId, state) {
   `).run(randomUUID(), sessionId, JSON.stringify(state));
 }
 
+function loadScenarioObjectives(scenarioId) {
+  return db
+    .prepare(`
+      SELECT objective_id, description, objective_rule, position
+      FROM objectives
+      WHERE scenario_id = ?
+      ORDER BY position, objective_id
+    `)
+    .all(scenarioId);
+}
+
+function objectiveMatchesState(objective, state, action) {
+  switch (objective.objective_rule) {
+    case "payment_completed":
+      return action === "end" || state.lastAction === "end";
+    case "customizations_added":
+      return Array.isArray(state.selectedCustomizations) && state.selectedCustomizations.length > 0;
+    case "clarification_requested":
+      return Number(state.clarificationCount || 0) > 0;
+    case "selected_item":
+    default:
+      return Boolean(state.selectedItem);
+  }
+}
+
+function computeObjectiveChecks(objectives, state, action) {
+  const checkedObjectiveIds = [];
+
+  for (const objective of objectives) {
+    if (objectiveMatchesState(objective, state, action)) {
+      checkedObjectiveIds.push(objective.objective_id);
+      continue;
+    }
+
+    break;
+  }
+
+  return checkedObjectiveIds;
+}
+
 function upsertSessionAnalytics({ sessionId, state, totalQuestions }) {
   const averageResponseTime = Number(state.averageResponseTimeSeconds || 0);
   const longestResponseTime = Number(state.longestResponseTimeSeconds || averageResponseTime);
@@ -174,6 +214,7 @@ export function updateSessionAfterTurn({
 }) {
   const session = loadSession(sessionId);
   const currentState = loadStoredState(sessionId);
+  const objectives = loadScenarioObjectives(session.scenario_id);
   const nextTotalQuestions = session.total_questions + (action === "greet" ? 0 : 1);
   const nextSuccessfulFirstAttempts =
     (currentState.successfulFirstAttempts || 0) + (successfulFirstAttempt ? 1 : 0);
@@ -205,6 +246,13 @@ export function updateSessionAfterTurn({
     measuredResponses: nextMeasuredResponses,
   };
 
+  const checkedObjectiveIds = computeObjectiveChecks(objectives, nextState, action);
+  nextState.completedObjectiveIds = checkedObjectiveIds;
+  nextState.completedObjectiveCount = checkedObjectiveIds.length;
+  nextState.objectiveCompleted = objectives.length
+    ? checkedObjectiveIds.length >= objectives.length
+    : Boolean(objectiveCompleted);
+
   saveStoredState(sessionId, nextState);
 
   db.prepare(`
@@ -220,9 +268,12 @@ export function updateSessionAfterTurn({
 
   db.prepare(`
     UPDATE objective_completion
-    SET is_checked = ?
+    SET is_checked = CASE
+      WHEN objective_id IN (${checkedObjectiveIds.map(() => "?").join(", ") || "NULL"}) THEN 1
+      ELSE 0
+    END
     WHERE session_id = ?
-  `).run(objectiveCompleted ? 1 : 0, sessionId);
+  `).run(...checkedObjectiveIds, sessionId);
 
   upsertSessionAnalytics({
     sessionId,

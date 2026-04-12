@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createSchema } from "./schema.js";
 import { seedDatabase } from "./seed.js";
+import { inferObjectiveRule } from "../data/scenarioDefaults.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +25,34 @@ function shouldRebuildDatabase(database) {
   const scenariosOk = tableHasColumn(database, "scenarios", "scenario_id");
   const sessionsOk = tableHasColumn(database, "sessions", "session_id");
   return !scenariosOk || !sessionsOk;
+}
+
+function ensureColumn(database, tableName, columnName, columnSql) {
+  if (!tableHasColumn(database, tableName, columnName)) {
+    database.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnSql}`);
+  }
+}
+
+function runMigrations(database) {
+  ensureColumn(database, "objectives", "objective_rule", "TEXT DEFAULT 'selected_item'");
+
+  const objectives = database
+    .prepare("SELECT objective_id, description, objective_rule FROM objectives")
+    .all();
+
+  const updateObjectiveRule = database.prepare(`
+    UPDATE objectives
+    SET objective_rule = ?
+    WHERE objective_id = ?
+  `);
+
+  objectives.forEach((objective) => {
+    if (objective.objective_rule) {
+      return;
+    }
+
+    updateObjectiveRule.run(inferObjectiveRule(objective.description), objective.objective_id);
+  });
 }
 
 let db = new Database(dbPath);
@@ -51,6 +80,7 @@ if (shouldRebuildDatabase(db)) {
 db.pragma("journal_mode = WAL");
 
 createSchema(db);
+runMigrations(db);
 seedDatabase(db);
 
 export { db };

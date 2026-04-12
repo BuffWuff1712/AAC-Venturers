@@ -52,6 +52,7 @@ export function createSchema(db) {
       objective_id TEXT PRIMARY KEY,
       scenario_id TEXT,
       description TEXT NOT NULL,
+      objective_rule TEXT DEFAULT 'selected_item',
       position INTEGER,
       is_required BOOLEAN DEFAULT 1,
       FOREIGN KEY (scenario_id) REFERENCES scenarios(scenario_id) ON DELETE CASCADE

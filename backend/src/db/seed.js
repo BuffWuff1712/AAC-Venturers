@@ -70,8 +70,8 @@ export function seedDatabase(db) {
 
   // Insert objectives
   const insertObjective = db.prepare(`
-    INSERT OR IGNORE INTO objectives (objective_id, scenario_id, description, position, is_required)
-    VALUES (@objective_id, @scenario_id, @description, @position, @is_required)
+    INSERT OR IGNORE INTO objectives (objective_id, scenario_id, description, objective_rule, position, is_required)
+    VALUES (@objective_id, @scenario_id, @description, @objective_rule, @position, @is_required)
   `);
 
   objectivesSeed.forEach((objective) => {

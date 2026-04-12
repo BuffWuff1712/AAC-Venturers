@@ -3,6 +3,13 @@ import { useRouter } from "next/router";
 import Image from "next/image";
 import { api } from "@/api/client";
 
+const OBJECTIVE_RULE_OPTIONS = [
+  { value: "selected_item", label: "Child selects an item" },
+  { value: "customizations_added", label: "Child adds or changes extras" },
+  { value: "clarification_requested", label: "Child asks for help or clarification" },
+  { value: "payment_completed", label: "Child completes payment" },
+];
+
 const ToggleRow = ({ title, enabled, onToggle, children }) => {
   return (
     <div className="rounded-[32px] border-b-8 border-gray-200 bg-white p-6 shadow-xl">
@@ -47,24 +54,20 @@ const fallbackScenario = {
   objectives: [
     {
       description: "Order food politely",
+      objectiveRule: "selected_item",
     },
     {
       description: "Ask for clarification if needed",
+      objectiveRule: "clarification_requested",
     },
     {
-      description: "Find a seat independently",
+      description: "Complete the purchase interaction",
+      objectiveRule: "payment_completed",
     },
   ],
 };
 
 const FALLBACK_LOCATION_IMAGE = "/images/canteen.jpg";
-
-function parseObjectivesInput(value) {
-  return String(value || "")
-    .split(/\r?\n/)
-    .map((line) => line.replace(/^\s*\d+\.\s*/, "").trim())
-    .filter(Boolean);
-}
 
 function resolveScenarioImage(locationImage) {
   if (typeof locationImage !== "string") {
@@ -94,7 +97,7 @@ const MainSettings = () => {
   const [formData, setFormData] = useState({
     locationName: "Canteen",
     locationImage: FALLBACK_LOCATION_IMAGE,
-    objectives: "",
+    objectives: [],
     backgroundNoise: 20,
     aiPersonality:
       "You are a friendly student also queuing in the same line. Encourage the child gently and wait for their response.",
@@ -115,9 +118,7 @@ const MainSettings = () => {
         setFormData({
           locationName: fallbackScenario.settings.location_name,
           locationImage: resolveScenarioImage(fallbackScenario.settings.location_image_url),
-          objectives: fallbackScenario.objectives
-            .map((objective, index) => `${index + 1}. ${objective.description}`)
-            .join("\n"),
+          objectives: fallbackScenario.objectives,
           backgroundNoise: fallbackScenario.settings.background_noise,
           aiPersonality: fallbackScenario.settings.ai_personality_prompt,
           contingencies: fallbackScenario.settings.contingencies,
@@ -136,12 +137,11 @@ const MainSettings = () => {
           locationImage: resolveScenarioImage(nextScenario.settings?.locationImageUrl),
           objectives: Array.isArray(nextScenario.objectives)
             ? nextScenario.objectives
-                .map(
-                  (objective, index) =>
-                    `${index + 1}. ${objective.description || ""}`
-                )
-                .join("\n")
-            : "",
+                .map((objective) => ({
+                  description: objective.description || "",
+                  objectiveRule: objective.objectiveRule || "selected_item",
+                }))
+            : [],
           backgroundNoise: Number(nextScenario.settings?.backgroundNoise ?? 20),
           aiPersonality: nextScenario.settings?.aiPersonalityPrompt || "",
           contingencies: nextScenario.settings?.contingencies || "",
@@ -181,6 +181,35 @@ const MainSettings = () => {
     }));
   };
 
+  const handleObjectiveChange = (index, key, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      objectives: prev.objectives.map((objective, objectiveIndex) =>
+        objectiveIndex === index ? { ...objective, [key]: value } : objective
+      ),
+    }));
+  };
+
+  const handleAddObjective = () => {
+    setFormData((prev) => ({
+      ...prev,
+      objectives: [
+        ...prev.objectives,
+        {
+          description: "",
+          objectiveRule: "selected_item",
+        },
+      ],
+    }));
+  };
+
+  const handleRemoveObjective = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      objectives: prev.objectives.filter((_, objectiveIndex) => objectiveIndex !== index),
+    }));
+  };
+
   const handleSave = async () => {
     setSaving(true);
 
@@ -189,7 +218,12 @@ const MainSettings = () => {
         await api.updateCaregiverScenarioSettings(scenarioId, {
           locationName: formData.locationName,
           locationImageUrl: formData.locationImage,
-          objectives: parseObjectivesInput(formData.objectives),
+          objectives: formData.objectives
+            .map((objective) => ({
+              description: String(objective.description || "").trim(),
+              objectiveRule: objective.objectiveRule || "selected_item",
+            }))
+            .filter((objective) => objective.description),
           backgroundNoise: Number(formData.backgroundNoise),
           aiPersonalityPrompt: formData.aiPersonality,
           contingencies: formData.contingencies,
@@ -287,13 +321,59 @@ const MainSettings = () => {
           <label className="mb-2 block text-lg font-bold text-text-brown">
             Scenario objectives
           </label>
-          <textarea
-            rows={5}
-            value={formData.objectives}
-            onChange={(e) => handleChange("objectives", e.target.value)}
-            placeholder="Enter objectives for this scenario"
-            className="w-full rounded-2xl border-2 border-caregiver-peach p-4 text-lg focus:outline-none"
-          />
+          <div className="flex flex-col gap-4">
+            {formData.objectives.map((objective, index) => (
+              <div
+                key={`${index}-${objective.objectiveRule}`}
+                className="rounded-2xl border-2 border-caregiver-peach bg-page-peach/40 p-4"
+              >
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-lg font-black text-text-brown">
+                    Objective {index + 1}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveObjective(index)}
+                    className="rounded-xl bg-white px-4 py-2 text-sm font-black text-text-brown shadow-[0_3px_0_#d1d5db]"
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                <input
+                  type="text"
+                  value={objective.description}
+                  onChange={(e) =>
+                    handleObjectiveChange(index, "description", e.target.value)
+                  }
+                  placeholder="Enter objective text"
+                  className="mb-3 w-full rounded-2xl border-2 border-caregiver-peach p-4 text-lg focus:outline-none"
+                />
+
+                <select
+                  value={objective.objectiveRule}
+                  onChange={(e) =>
+                    handleObjectiveChange(index, "objectiveRule", e.target.value)
+                  }
+                  className="w-full rounded-2xl border-2 border-caregiver-peach p-4 text-lg focus:outline-none"
+                >
+                  {OBJECTIVE_RULE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={handleAddObjective}
+              className="self-start rounded-2xl bg-white px-6 py-3 text-lg font-black text-text-brown shadow-[0_4px_0_#d1d5db]"
+            >
+              Add Objective
+            </button>
+          </div>
         </ToggleRow>
 
         <ToggleRow

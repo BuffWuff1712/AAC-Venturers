@@ -5,7 +5,7 @@ import {
   buildDefaultScenarioSettings,
   mergeObjectives,
   mergeScenarioSettings,
-  normalizeObjectiveDescriptions,
+  normalizeObjectives,
 } from "../data/scenarioDefaults.js";
 
 export const caregiverRoutes = Router();
@@ -28,6 +28,7 @@ function mapObjective(objective) {
     objectiveId: objective.objective_id,
     scenarioId: objective.scenario_id,
     description: objective.description,
+    objectiveRule: objective.objective_rule,
     position: objective.position,
     isRequired: Boolean(objective.is_required),
   };
@@ -155,7 +156,7 @@ caregiverRoutes.put("/scenarios/:scenarioId/settings", (req, res) => {
       return res.status(404).json({ message: "Scenario not found" });
     }
 
-    const objectiveDescriptions = normalizeObjectiveDescriptions(objectives);
+    const normalizedObjectives = normalizeObjectives(objectives);
 
     const saveScenarioSettings = db.transaction(() => {
       const existingSettings = db
@@ -197,17 +198,18 @@ caregiverRoutes.put("/scenarios/:scenarioId/settings", (req, res) => {
 
       db.prepare("DELETE FROM objectives WHERE scenario_id = ?").run(scenarioId);
 
-      if (objectiveDescriptions.length) {
+      if (normalizedObjectives.length) {
         const insertObjective = db.prepare(`
-          INSERT INTO objectives (objective_id, scenario_id, description, position, is_required)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT INTO objectives (objective_id, scenario_id, description, objective_rule, position, is_required)
+          VALUES (?, ?, ?, ?, ?, ?)
         `);
 
-        objectiveDescriptions.forEach((description, index) => {
+        normalizedObjectives.forEach((objective, index) => {
           insertObjective.run(
             `${scenarioId}-objective-${index + 1}`,
             scenarioId,
-            description,
+            objective.description,
+            objective.objectiveRule,
             index + 1,
             1,
           );

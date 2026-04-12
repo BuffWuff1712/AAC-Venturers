@@ -11,8 +11,14 @@ import { PromptAnalytic, SessionResult, TranscriptEntry } from "../../types/scen
 
 const DEFAULT_SCENARIO_ID = "scenario-001";
 const FALLBACK_TITLE = "Canteen";
-const FALLBACK_OBJECTIVE =
-  "Order at least one menu item clearly Then Complete the purchase interaction";
+const FALLBACK_OBJECTIVES = [
+  "Order at least one menu item clearly",
+  "Complete the purchase interaction",
+];
+
+type ScenarioObjective = {
+  description?: string;
+};
 
 const CanteenScenario: React.FC = () => {
   const router = useRouter();
@@ -24,7 +30,8 @@ const CanteenScenario: React.FC = () => {
   const [scenarioDone, setScenarioDone] = useState(false);
   const [sessionId, setSessionId] = useState("");
   const [scenarioTitle, setScenarioTitle] = useState(FALLBACK_TITLE);
-  const [scenarioObjective, setScenarioObjective] = useState(FALLBACK_OBJECTIVE);
+  const [scenarioObjectives, setScenarioObjectives] = useState(FALLBACK_OBJECTIVES);
+  const [completedObjectiveCount, setCompletedObjectiveCount] = useState(0);
   const [characterSpeech, setCharacterSpeech] = useState("Starting session...");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
@@ -33,9 +40,9 @@ const CanteenScenario: React.FC = () => {
   const promptStartRef = useRef<number>(Date.now());
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const totalSteps = 4;
+  const totalSteps = Math.max(scenarioObjectives.length, 1);
   const currentStep = Math.min(
-    transcript.filter((entry) => entry.speaker === "child").length + 1,
+    completedObjectiveCount + 1,
     totalSteps
   );
 
@@ -110,7 +117,12 @@ const CanteenScenario: React.FC = () => {
 
         setSessionId(response.sessionId || "");
         setScenarioTitle(response.scenario?.title || FALLBACK_TITLE);
-        setScenarioObjective(response.scenario?.objective || FALLBACK_OBJECTIVE);
+        setScenarioObjectives(
+          Array.isArray(response.scenario?.objectives) && response.scenario.objectives.length
+            ? response.scenario.objectives.map((objective: ScenarioObjective) => objective.description || "")
+            : FALLBACK_OBJECTIVES
+        );
+        setCompletedObjectiveCount(Number(response.completedObjectiveCount || 0));
         setCharacterSpeech(
           openingMessage?.message || "Hi there! What would you like today?"
         );
@@ -179,6 +191,8 @@ const CanteenScenario: React.FC = () => {
           addEntry("friend", "Stall Owner", response.message);
           setCharacterSpeech(response.message);
         }
+
+        setCompletedObjectiveCount(Number(response?.completedObjectiveCount || 0));
 
         if (response?.status === "completed") {
           const totalMs = analytics.reduce(
@@ -277,8 +291,11 @@ const CanteenScenario: React.FC = () => {
       return "Setting up your practice session...";
     }
 
-    return scenarioObjective || "Listen carefully and respond to the stall owner.";
-  }, [errorMessage, isLoadingSession, scenarioObjective]);
+    return (
+      scenarioObjectives[Math.min(completedObjectiveCount, Math.max(scenarioObjectives.length - 1, 0))] ||
+      "Listen carefully and respond to the stall owner."
+    );
+  }, [completedObjectiveCount, errorMessage, isLoadingSession, scenarioObjectives]);
 
   return (
     <div className="relative h-screen w-screen overflow-hidden font-fredoka">

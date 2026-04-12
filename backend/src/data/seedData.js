@@ -5,7 +5,7 @@ import {
   DEFAULT_LOCATION_IMAGE_URL,
   DEFAULT_LOCATION_NAME,
   DEFAULT_AI_PERSONALITY_PROMPT,
-  DEFAULT_OBJECTIVE_DESCRIPTIONS,
+  DEFAULT_OBJECTIVES,
 } from "./scenarioDefaults.js";
 
 // Stable IDs for seed data - using strings instead of randomUUID for reproducibility
@@ -67,14 +67,16 @@ export const objectivesSeed = [
   {
     objective_id: objective1Id,
     scenario_id: scenarioId,
-    description: DEFAULT_OBJECTIVE_DESCRIPTIONS[0],
+    description: DEFAULT_OBJECTIVES[0].description,
+    objective_rule: DEFAULT_OBJECTIVES[0].objective_rule,
     position: 1,
     is_required: 1,
   },
   {
     objective_id: objective2Id,
     scenario_id: scenarioId,
-    description: DEFAULT_OBJECTIVE_DESCRIPTIONS[1],
+    description: DEFAULT_OBJECTIVES[1].description,
+    objective_rule: DEFAULT_OBJECTIVES[1].objective_rule,
     position: 2,
     is_required: 1,
   },

@@ -111,6 +111,7 @@ export function loadScenarioContext(scenarioId) {
       objectives: objectives.map((objective) => ({
         objectiveId: objective.objective_id,
         description: objective.description,
+        objectiveRule: objective.objective_rule,
         position: objective.position,
         isRequired: Boolean(objective.is_required),
       })),
@@ -228,6 +229,22 @@ export function loadSession(sessionId) {
       };
     });
 
+  const objectiveProgress = db
+    .prepare(`
+      SELECT oc.objective_id, oc.is_checked, o.description, o.position
+      FROM objective_completion oc
+      INNER JOIN objectives o ON o.objective_id = oc.objective_id
+      WHERE oc.session_id = ?
+      ORDER BY o.position, o.objective_id
+    `)
+    .all(sessionId)
+    .map((row) => ({
+      objectiveId: row.objective_id,
+      description: row.description,
+      position: row.position,
+      isChecked: Boolean(row.is_checked),
+    }));
+
   const transcripts = buildTranscripts(interactions);
   const lastAssistantInteraction = [...interactions].reverse().find((interaction) => interaction.questionText);
 
@@ -266,6 +283,14 @@ export function loadSession(sessionId) {
     averageResponseTimeMs: Math.round((storedState.averageResponseTimeSeconds || 0) * 1000),
     hints_used: storedState.hintsUsed || 0,
     clarification_count: storedState.clarificationCount || 0,
+    objective_progress: objectiveProgress,
+    objectiveProgress,
+    completed_objective_count:
+      storedState.completedObjectiveCount ||
+      objectiveProgress.filter((objective) => objective.isChecked).length,
+    completedObjectiveCount:
+      storedState.completedObjectiveCount ||
+      objectiveProgress.filter((objective) => objective.isChecked).length,
     sessionState: storedState,
     interactions,
     transcripts,

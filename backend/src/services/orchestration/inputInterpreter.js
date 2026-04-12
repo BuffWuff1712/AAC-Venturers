@@ -61,7 +61,11 @@ const PREFERENCE_ALIASES = {
  * Lowercases and compresses whitespace so intent and alias checks stay consistent.
  */
 function normalizeText(text = "") {
-  return String(text).trim().toLowerCase().replace(/\s+/g, " ");
+  return String(text)
+    .trim()
+    .toLowerCase()
+    .replace(/[.!?,;:]+$/g, "")
+    .replace(/\s+/g, " ");
 }
 
 /**
@@ -100,6 +104,28 @@ function asksCustomizationOptions(text = "") {
   return /\b(customisations|customizations|changes|options)\b/.test(normalizeText(text));
 }
 
+function asksPaymentOptions(text = "") {
+  return /\b(cash|card|paynow|paylah|payment mode|payment method|how do i pay|can i pay by|what payment)\b/.test(
+    normalizeText(text),
+  );
+}
+
+function indicatesPaymentDone(text = "") {
+  return /\b(i paid|have paid|paid already|payment done|done paying|i pay by|i paid by|i have paid by)\b/.test(
+    normalizeText(text),
+  );
+}
+
+function isAddOnPhrase(text = "") {
+  return /\b(add|also|and|plus|too|another|with)\b/.test(normalizeText(text));
+}
+
+function isRemovalPhrase(text = "") {
+  return /\b(remove|without|cancel|take off|take away|no more|don't want|do not want)\b/.test(
+    normalizeText(text),
+  );
+}
+
 /**
  * Pulls customization preferences out of the child input using normalized alias matching.
  */
@@ -119,6 +145,22 @@ function detectPreferences(text = "") {
   return [...found];
 }
 
+function detectRemovedPreferences(text = "") {
+  const normalized = normalizeText(text);
+  const removablePreferences = [...new Set(Object.values(PREFERENCE_ALIASES))].filter(
+    (preference) => preference !== "no customisations",
+  );
+
+  return removablePreferences.filter((preference) => {
+    if (normalized.includes(`remove ${preference}`)) return true;
+    if (normalized.includes(`cancel ${preference}`)) return true;
+    if (normalized.includes(`without ${preference}`)) return true;
+    if (normalized.includes(`no more ${preference}`)) return true;
+    if (normalized.includes(`no ${preference}`) && preference.startsWith("extra ")) return true;
+    return false;
+  });
+}
+
 /**
  * Uses lightweight heuristics to classify the child's high-level intent before any LLM help.
  */
@@ -128,6 +170,8 @@ function inferIntent(text = "") {
   if (!normalized) return "silence";
   if (/(what do you have|what can i order|show me the menu|menu|what items|which items|what food|what foods)/.test(normalized)) return "ask_menu";
   if (/(usual|same as last time|same order|my favourite|my favorite)/.test(normalized)) return "ask_usual";
+  if (indicatesPaymentDone(normalized)) return "pay";
+  if (asksPaymentOptions(normalized)) return "ask_payment_options";
   if (/(i paid|paid|cash|card|payment done|done paying|paynow|paylah)/.test(normalized)) return "pay";
   if (/(repeat|say again|again please)/.test(normalized)) return "repeat";
   if (/(what should i say|what can i say|say for me)/.test(normalized)) return "model_phrase";
@@ -151,6 +195,7 @@ function buildFallbackInterpretation(childInput, history = [], session = {}) {
   const lastAction = session.last_action || session.lastAction || "";
   const candidateItem = detectItem(childInput);
   const customizationContext = lastAction === "ask_customization";
+  const changeFollowUpContext = lastAction === "follow_up";
   const confirmationContext = ["confirm_order", "request_payment"].includes(lastAction);
   const correctionRequested =
     isCorrectionPhrase(normalized) ||
@@ -159,6 +204,26 @@ function buildFallbackInterpretation(childInput, history = [], session = {}) {
     currentSelectedItem &&
     asksCustomizationOptions(normalized) &&
     !preferences.length;
+  const paymentOptionsRequested =
+    Boolean(session.pending_payment) &&
+    asksPaymentOptions(normalized) &&
+    !indicatesPaymentDone(normalized) &&
+    !/^(cash|card|paynow|paylah|paid)$/i.test(normalized);
+  const addOnRequested =
+    Boolean(currentSelectedItem) &&
+    Boolean(candidateItem) &&
+    candidateItem !== currentSelectedItem &&
+    !correctionRequested &&
+    !changeFollowUpContext &&
+    (isAddOnPhrase(normalized) || Boolean(session.pending_payment));
+  const removedPreferences = detectRemovedPreferences(childInput);
+  const removedAddOnItem =
+    Boolean(currentSelectedItem) &&
+    Boolean(candidateItem) &&
+    candidateItem !== currentSelectedItem &&
+    isRemovalPhrase(normalized)
+      ? candidateItem
+      : "";
   const item =
     currentSelectedItem &&
     preferences.length &&
@@ -184,6 +249,10 @@ function buildFallbackInterpretation(childInput, history = [], session = {}) {
     intent = "ask_customization_options";
   }
 
+  if (paymentOptionsRequested) {
+    intent = "ask_payment_options";
+  }
+
   return {
     intent,
     item,
@@ -192,7 +261,7 @@ function buildFallbackInterpretation(childInput, history = [], session = {}) {
     asksMenu: intent === "ask_menu",
     asksUsual: intent === "ask_usual",
     asksHelp: intent === "ask_help",
-    confused: ["confused", "unknown"].includes(intent),
+    confused: intent === "confused",
     paymentDone: intent === "pay",
     repeatRequested: intent === "repeat",
     modelPhraseRequested: intent === "model_phrase",
@@ -200,7 +269,11 @@ function buildFallbackInterpretation(childInput, history = [], session = {}) {
     affirmative: intent === "affirm",
     declineCustomization: intent === "decline_customization",
     changeOrderRequested: correctionRequested,
+    addOnRequested,
+    removedPreferences,
+    removedAddOnItem,
     asksCustomizationOptions: customizationOptionsRequested,
+    asksPaymentOptions: paymentOptionsRequested || intent === "ask_payment_options",
     historyLength: history.length,
   };
 }
@@ -225,6 +298,7 @@ function shouldUseFallbackOnly(interpretation) {
     "decline_customization",
     "change_order",
     "ask_customization_options",
+    "ask_payment_options",
     "unavailable_request",
     "place_order",
     "modify_order",
