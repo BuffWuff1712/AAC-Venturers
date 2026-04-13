@@ -121,6 +121,7 @@ const CanteenScenario: React.FC = () => {
         }
 
         promptStartRef.current = Date.now();
+        setCountdown(30);
         setIsRecording(true);
         setCountdown(30);
         startCountdown();
@@ -237,6 +238,7 @@ const CanteenScenario: React.FC = () => {
         }
 
         promptStartRef.current = Date.now();
+        setCountdown(30);
         setIsRecording(true);
         startCountdown();
       } catch (err) {

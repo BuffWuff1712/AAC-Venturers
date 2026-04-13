@@ -85,7 +85,7 @@ const Home = () => {
             onClick={handleChildClick}
           />
           <ProfileButton
-            label="Caregiver"
+            label="Therapist"
             avatarSrc="/images/caregiver.png"
             bgColorClass="bg-caregiver-peach"
             onClick={() => {
