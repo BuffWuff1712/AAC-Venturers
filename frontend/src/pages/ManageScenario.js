@@ -18,6 +18,8 @@ const fallbackScenarios = [
   },
 ];
 
+const FALLBACK_LOCATION_IMAGE = "/images/canteen.jpg";
+
 function resolveScenarioImage(scenario) {
   const rawImage =
     scenario?.locationImageUrl ||
@@ -26,18 +28,28 @@ function resolveScenarioImage(scenario) {
     "";
 
   if (!rawImage || typeof rawImage !== "string") {
-    return "/images/canteen.jpg";
+    return FALLBACK_LOCATION_IMAGE;
   }
 
-  if (rawImage.startsWith("http://") || rawImage.startsWith("https://")) {
-    return rawImage;
+  const normalizedImage = rawImage.trim();
+
+  if (!normalizedImage || normalizedImage === "/images/western-stall.jpg") {
+    return FALLBACK_LOCATION_IMAGE;
   }
 
-  if (rawImage.startsWith("/uploads/")) {
-    return `${BACKEND_BASE}${rawImage}`;
+  if (
+    normalizedImage.startsWith("http://") ||
+    normalizedImage.startsWith("https://") ||
+    normalizedImage.startsWith("blob:")
+  ) {
+    return normalizedImage;
   }
 
-  return rawImage;
+  if (normalizedImage.startsWith("/uploads/")) {
+    return `${BACKEND_BASE}${normalizedImage}`;
+  }
+
+  return normalizedImage;
 }
 
 const ManageScenario = () => {
