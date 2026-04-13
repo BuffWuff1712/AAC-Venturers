@@ -3,6 +3,10 @@ import Image from "next/image";
 import { useRouter } from "next/router";
 import { api } from "@/api/client";
 
+const BACKEND_BASE =
+  process.env.NEXT_PUBLIC_API_BASE?.replace(/\/api$/, "") ||
+  "http://localhost:4000";
+
 const fallbackScenarios = [
   {
     scenarioId: "scenario-001",
@@ -13,7 +17,6 @@ const fallbackScenarios = [
   },
 ];
 
-const lockedScenarioNames = ["Library", "Playground"];
 const FALLBACK_LOCATION_IMAGE = "/images/canteen.jpg";
 
 function resolveScenarioImage(locationImage) {
@@ -25,6 +28,18 @@ function resolveScenarioImage(locationImage) {
 
   if (!normalizedImage || normalizedImage === "/images/western-stall.jpg") {
     return FALLBACK_LOCATION_IMAGE;
+  }
+
+  if (
+    normalizedImage.startsWith("http://") ||
+    normalizedImage.startsWith("https://") ||
+    normalizedImage.startsWith("blob:")
+  ) {
+    return normalizedImage;
+  }
+
+  if (normalizedImage.startsWith("/uploads/")) {
+    return `${BACKEND_BASE}${normalizedImage}`;
   }
 
   return normalizedImage;
@@ -44,7 +59,8 @@ const ScenariosPage = () => {
         if (!isMounted) return;
 
         setApiScenarios(Array.isArray(data) ? data : []);
-      } catch {
+      } catch (error) {
+        console.error("Failed to load child scenarios:", error);
         if (!isMounted) return;
         setApiScenarios([]);
       }
@@ -63,8 +79,15 @@ const ScenariosPage = () => {
         scenarioId: scenario.scenarioId,
         title: scenario.title || "Canteen",
         locationName: scenario.locationName || scenario.title || "School Canteen",
-        locationImage: resolveScenarioImage(scenario.locationImage),
-        description: "Learn how to greet a friend and start a conversation!",
+        locationImage: resolveScenarioImage(
+          scenario.locationImageUrl ||
+            scenario.locationImage ||
+            scenario.settings?.location_image_url ||
+            scenario.settings?.locationImageUrl
+        ),
+        description:
+          scenario.description ||
+          "Learn how to greet a friend and start a conversation!",
       }));
     }
 
@@ -128,6 +151,7 @@ const ScenariosPage = () => {
                 alt={scenario.title}
                 fill
                 className="object-cover"
+                unoptimized
               />
             </div>
 
@@ -153,17 +177,6 @@ const ScenariosPage = () => {
                   : "Start Adventure"}
               </button>
             </div>
-          </div>
-        ))}
-
-        {lockedScenarioNames.map((name) => (
-          <div
-            key={name}
-            className="relative flex min-h-[300px] flex-col items-center justify-center gap-3 rounded-[40px] border-b-8 border-dashed border-gray-200 bg-white/60 p-6 shadow"
-          >
-            <span className="text-5xl">🔒</span>
-            <h2 className="text-2xl font-black text-gray-400">{name}</h2>
-            <p className="text-sm font-medium text-gray-400">Coming soon!</p>
           </div>
         ))}
       </div>

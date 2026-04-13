@@ -25,7 +25,7 @@ const ToggleRow = ({ title, enabled, onToggle, children }) => {
         >
           <span
             className={`absolute top-1.5 h-9 w-9 rounded-full bg-white shadow-md transition-all ${
-              enabled ? "left-13" : "left-1.5"
+              enabled ? "left-[54px]" : "left-1.5"
             }`}
           />
         </button>
@@ -43,10 +43,10 @@ const fallbackScenario = {
     isActive: true,
   },
   settings: {
-    location_name: "Canteen",
-    location_image_url: "/images/canteen.jpg",
-    background_noise: 20,
-    ai_personality_prompt:
+    locationName: "Canteen",
+    locationImageUrl: "/images/canteen.jpg",
+    backgroundNoise: 20,
+    aiPersonalityPrompt:
       "You are a friendly student also queuing in the same line. Encourage the child gently and wait for their response.",
     contingencies:
       "If the child is silent for 10 seconds, prompt the child again. If the child is still silent for another 10 seconds, ask a follow-up clarification question.",
@@ -67,7 +67,27 @@ const fallbackScenario = {
   ],
 };
 
+const emptyScenario = {
+  scenario: {
+    scenarioId: "",
+    title: "",
+    isActive: true,
+  },
+  settings: {
+    locationName: "",
+    locationImageUrl: "",
+    backgroundNoise: 20,
+    aiPersonalityPrompt: "",
+    contingencies: "",
+  },
+  objectives: [],
+};
+
 const FALLBACK_LOCATION_IMAGE = "/images/canteen.jpg";
+
+const BACKEND_BASE =
+  process.env.NEXT_PUBLIC_API_BASE?.replace(/\/api$/, "") ||
+  "http://localhost:4000";
 
 function resolveScenarioImage(locationImage) {
   if (typeof locationImage !== "string") {
@@ -80,12 +100,28 @@ function resolveScenarioImage(locationImage) {
     return FALLBACK_LOCATION_IMAGE;
   }
 
+  if (
+    normalizedImage.startsWith("http://") ||
+    normalizedImage.startsWith("https://") ||
+    normalizedImage.startsWith("blob:")
+  ) {
+    return normalizedImage;
+  }
+
+  if (normalizedImage.startsWith("/uploads/")) {
+    return `${BACKEND_BASE}${normalizedImage}`;
+  }
+
   return normalizedImage;
 }
 
 const MainSettings = () => {
   const router = useRouter();
-  const { scenarioId, scenarioTitle } = router.query;
+  const { scenarioId, scenarioTitle, mode } = router.query;
+
+  const isEditMode = mode === "edit" || Boolean(scenarioId);
+  const isAddMode = mode === "add" || !scenarioId;
+
   const [settings, setSettings] = useState({
     locationNameEnabled: true,
     locationImageEnabled: true,
@@ -94,18 +130,21 @@ const MainSettings = () => {
     aiPersonalityEnabled: true,
     contingenciesEnabled: true,
   });
+
   const [formData, setFormData] = useState({
-    locationName: "Canteen",
+    locationName: "",
     locationImage: FALLBACK_LOCATION_IMAGE,
     objectives: [],
     backgroundNoise: 20,
-    aiPersonality:
-      "You are a friendly student also queuing in the same line. Encourage the child gently and wait for their response.",
-    contingencies:
-      "If the child is silent for 10 seconds, prompt the child again. If the child is still silent for another 10 seconds, ask a follow-up clarification question.",
+    aiPersonality: "",
+    contingencies: "",
   });
+
+  const [locationImageFile, setLocationImageFile] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [loadedScenario, setLoadedScenario] = useState(fallbackScenario);
+  const [loadedScenario, setLoadedScenario] = useState(
+    isEditMode ? fallbackScenario : emptyScenario
+  );
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -113,8 +152,11 @@ const MainSettings = () => {
     let isMounted = true;
 
     const loadScenario = async () => {
-      if (!scenarioId) {
-        setLoadedScenario(fallbackScenario);
+      if (isAddMode && !scenarioId) {
+        if (!isMounted) return;
+
+        setLoadedScenario(emptyScenario);
+        setLocationImageFile(null);
         setFormData({
           locationName: fallbackScenario.settings.location_name,
           locationImage: resolveScenarioImage(fallbackScenario.settings.location_image_url),
@@ -132,6 +174,7 @@ const MainSettings = () => {
 
         const nextScenario = data || fallbackScenario;
         setLoadedScenario(nextScenario);
+        setLocationImageFile(null);
         setFormData({
           locationName: nextScenario.settings?.locationName || "Canteen",
           locationImage: resolveScenarioImage(nextScenario.settings?.locationImageUrl),
@@ -149,6 +192,19 @@ const MainSettings = () => {
       } catch {
         if (!isMounted) return;
         setLoadedScenario(fallbackScenario);
+        setLocationImageFile(null);
+        setFormData({
+          locationName: fallbackScenario.settings.locationName,
+          locationImage: resolveScenarioImage(
+            fallbackScenario.settings.locationImageUrl
+          ),
+          objectives: fallbackScenario.objectives
+            .map((objective, index) => `${index + 1}. ${objective.description}`)
+            .join("\n"),
+          backgroundNoise: fallbackScenario.settings.backgroundNoise,
+          aiPersonality: fallbackScenario.settings.aiPersonalityPrompt,
+          contingencies: fallbackScenario.settings.contingencies,
+        });
       }
     };
 
@@ -157,15 +213,28 @@ const MainSettings = () => {
     return () => {
       isMounted = false;
     };
-  }, [router.isReady, scenarioId]);
+  }, [router.isReady, scenarioId, isAddMode, isEditMode]);
 
   const pageTitle = useMemo(() => {
-    if (typeof scenarioTitle === "string" && scenarioTitle.trim()) {
-      return scenarioTitle;
+    if (isAddMode) {
+      return "Add Scenario";
     }
 
-    return loadedScenario.scenario?.title || "Canteen";
-  }, [loadedScenario.scenario?.title, scenarioTitle]);
+    return "Main Settings";
+  }, [isAddMode]);
+
+  const pageSubtitle = useMemo(() => {
+    if (isAddMode) {
+      return "Configure the main settings for a new scenario";
+    }
+
+    const scenarioName =
+      typeof scenarioTitle === "string" && scenarioTitle.trim()
+        ? scenarioTitle
+        : loadedScenario.scenario?.title || "this scenario";
+
+    return `Configure the main scenario settings for ${scenarioName}`;
+  }, [isAddMode, loadedScenario.scenario?.title, scenarioTitle]);
 
   const handleToggle = (key) => {
     setSettings((prev) => ({
@@ -210,6 +279,26 @@ const MainSettings = () => {
     }));
   };
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const previewUrl = URL.createObjectURL(file);
+
+    setLocationImageFile(file);
+    setFormData((prev) => ({
+      ...prev,
+      locationImage: previewUrl,
+    }));
+  };
+
+  const buildObjectivesArray = () => {
+    return formData.objectives
+      .split("\n")
+      .map((line) => line.replace(/^\d+\.\s*/, "").trim())
+      .filter(Boolean);
+  };
+
   const handleSave = async () => {
     setSaving(true);
 
@@ -218,6 +307,7 @@ const MainSettings = () => {
         await api.updateCaregiverScenarioSettings(scenarioId, {
           locationName: formData.locationName,
           locationImageUrl: formData.locationImage,
+          locationImage: locationImageFile,
           objectives: formData.objectives
             .map((objective) => ({
               description: String(objective.description || "").trim(),
@@ -230,12 +320,45 @@ const MainSettings = () => {
         });
       }
 
-      alert("Scenario main settings saved successfully!");
+      if (isEditMode && scenarioId) {
+        await api.updateCaregiverScenarioSettings(scenarioId, payload);
+      } else {
+        await api.createCaregiverScenario(payload);
+      }
+
+      alert(
+        isEditMode
+          ? "Scenario main settings saved successfully!"
+          : "New scenario created successfully!"
+      );
+
       router.push({
         pathname: "/ManageScenario",
       });
     } catch (err) {
       alert(err.message || "Unable to save scenario settings.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!isEditMode || !scenarioId) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this scenario? This action cannot be undone."
+    );
+
+    if (!confirmed) return;
+
+    setSaving(true);
+
+    try {
+      await api.deleteCaregiverScenario(scenarioId);
+      alert("Scenario deleted successfully!");
+      router.push("/ManageScenario");
+    } catch (err) {
+      alert(err.message || "Unable to delete scenario.");
     } finally {
       setSaving(false);
     }
@@ -256,10 +379,10 @@ const MainSettings = () => {
 
       <div className="mx-auto mb-10 max-w-6xl text-center">
         <h1 className="mb-3 text-6xl font-black text-text-brown">
-          Main Settings
+          {pageTitle}
         </h1>
         <p className="text-2xl font-bold text-text-brown opacity-70">
-          Configure the main scenario settings for {pageTitle}
+          {pageSubtitle}
         </p>
       </div>
 
@@ -287,14 +410,14 @@ const MainSettings = () => {
           onToggle={() => handleToggle("locationImageEnabled")}
         >
           <label className="mb-2 block text-lg font-bold text-text-brown">
-            Image path or URL
+            Upload location image
           </label>
+
           <input
-            type="text"
-            value={formData.locationImage}
-            onChange={(e) => handleChange("locationImage", e.target.value)}
-            placeholder="/images/canteen.jpg"
-            className="mb-4 w-full rounded-2xl border-2 border-caregiver-peach p-4 text-lg focus:outline-none"
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            className="mb-4 w-full rounded-2xl border-2 border-caregiver-peach bg-white p-4 text-lg focus:outline-none file:mr-4 file:rounded-xl file:border-0 file:bg-caregiver-peach file:px-4 file:py-2 file:font-bold file:text-text-brown hover:file:bg-[#ffc891]"
           />
 
           <div className="relative h-64 w-full overflow-hidden rounded-[28px] border-2 border-dashed border-caregiver-peach bg-white">
@@ -304,6 +427,7 @@ const MainSettings = () => {
                 alt="Location Preview"
                 fill
                 className="object-cover"
+                unoptimized
               />
             ) : (
               <div className="flex h-full items-center justify-center text-lg font-bold text-gray-400">
@@ -386,7 +510,9 @@ const MainSettings = () => {
           </label>
           <select
             value={formData.backgroundNoise}
-            onChange={(e) => handleChange("backgroundNoise", Number(e.target.value))}
+            onChange={(e) =>
+              handleChange("backgroundNoise", Number(e.target.value))
+            }
             className="w-full rounded-2xl border-2 border-caregiver-peach p-4 text-lg focus:outline-none"
           >
             <option value={0}>No background noise</option>
@@ -431,21 +557,41 @@ const MainSettings = () => {
         </ToggleRow>
       </div>
 
-      <div className="mx-auto mt-10 flex max-w-6xl flex-col gap-4 sm:flex-row sm:justify-end">
-        <button
-          onClick={() => router.push("/ManageScenario")}
-          className="rounded-2xl bg-white px-8 py-4 text-xl font-black text-text-brown shadow-[0_5px_0_#d1d5db] transition-all hover:translate-y-[5px] hover:shadow-none"
-        >
-          Cancel
-        </button>
+      <div className="mx-auto mt-10 flex max-w-6xl flex-col gap-4 sm:flex-row sm:justify-between">
+        <div>
+          {isEditMode && scenarioId ? (
+            <button
+              onClick={handleDelete}
+              disabled={saving}
+              className="rounded-2xl bg-red-500 px-8 py-4 text-xl font-black text-white shadow-[0_5px_0_#c24141] transition-all hover:translate-y-[5px] hover:shadow-none disabled:opacity-60"
+            >
+              Delete Scenario
+            </button>
+          ) : null}
+        </div>
 
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="rounded-2xl bg-child-green px-8 py-4 text-xl font-black text-text-brown shadow-[0_5px_0_#92c45e] transition-all hover:translate-y-[5px] hover:shadow-none disabled:opacity-60"
-        >
-          {saving ? "Saving..." : "Save Settings"}
-        </button>
+        <div className="flex flex-col gap-4 sm:flex-row">
+          <button
+            onClick={() => router.push("/ManageScenario")}
+            className="rounded-2xl bg-white px-8 py-4 text-xl font-black text-text-brown shadow-[0_5px_0_#d1d5db] transition-all hover:translate-y-[5px] hover:shadow-none"
+          >
+            Cancel
+          </button>
+
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="rounded-2xl bg-child-green px-8 py-4 text-xl font-black text-text-brown shadow-[0_5px_0_#92c45e] transition-all hover:translate-y-[5px] hover:shadow-none disabled:opacity-60"
+          >
+            {saving
+              ? isAddMode
+                ? "Creating..."
+                : "Saving..."
+              : isAddMode
+                ? "Create Scenario"
+                : "Save Settings"}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -37,7 +37,7 @@ const TranscriptPanel: React.FC<TranscriptPanelProps> = ({ entries }) => {
 
       {/* Scrollable entry list
           Max height set to max-h-40 to keep it manageable */}
-      <div className="overflow-y-auto max-h-40 px-5 py-4 space-y-2">
+      <div className="overflow-y-auto max-h-32 px-5 py-4 space-y-2">
         {entries.length === 0 && (
           // Color updated to text-text-brown with opacity
           <p className="text-sm text-text-brown opacity-50 italic">

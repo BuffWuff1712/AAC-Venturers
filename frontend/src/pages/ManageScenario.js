@@ -3,6 +3,10 @@ import Image from "next/image";
 import { useRouter } from "next/router";
 import { api, clearAuthSession } from "@/api/client";
 
+const BACKEND_BASE =
+  process.env.NEXT_PUBLIC_API_BASE?.replace(/\/api$/, "") ||
+  "http://localhost:4000";
+
 const fallbackScenarios = [
   {
     scenarioId: "scenario-001",
@@ -13,6 +17,28 @@ const fallbackScenarios = [
     description: "Practice ordering noodles and finding seats.",
   },
 ];
+
+function resolveScenarioImage(scenario) {
+  const rawImage =
+    scenario?.locationImageUrl ||
+    scenario?.imageUrl ||
+    scenario?.settings?.location_image_url ||
+    "";
+
+  if (!rawImage || typeof rawImage !== "string") {
+    return "/images/canteen.jpg";
+  }
+
+  if (rawImage.startsWith("http://") || rawImage.startsWith("https://")) {
+    return rawImage;
+  }
+
+  if (rawImage.startsWith("/uploads/")) {
+    return `${BACKEND_BASE}${rawImage}`;
+  }
+
+  return rawImage;
+}
 
 const ManageScenario = () => {
   const router = useRouter();
@@ -27,7 +53,8 @@ const ManageScenario = () => {
         if (!isMounted) return;
 
         setApiScenarios(Array.isArray(data) ? data : []);
-      } catch {
+      } catch (error) {
+        console.error("Failed to load scenarios:", error);
         if (!isMounted) return;
         setApiScenarios([]);
       }
@@ -44,11 +71,14 @@ const ManageScenario = () => {
     if (apiScenarios.length > 0) {
       return apiScenarios.map((scenario) => ({
         scenarioId: scenario.scenarioId,
-        title: scenario.title || "Canteen",
-        locationName: scenario.locationName || scenario.title || "School Canteen",
-        isActive: scenario.isActive,
-        image: "/images/canteen.jpg",
-        description: "Practice ordering noodles and finding seats.",
+        title: scenario.title || "Untitled Scenario",
+        locationName:
+          scenario.locationName || scenario.title || "Unknown Location",
+        isActive: Boolean(scenario.isActive),
+        image: resolveScenarioImage(scenario),
+        description:
+          scenario.description ||
+          "Practice ordering noodles and finding seats.",
       }));
     }
 
@@ -76,6 +106,22 @@ const ManageScenario = () => {
         </p>
       </div>
 
+      <div className="mb-8 flex w-full max-w-6xl justify-end">
+        <button
+          onClick={() =>
+            router.push({
+              pathname: "/MainSettings",
+              query: {
+                mode: "add",
+              },
+            })
+          }
+          className="flex items-center justify-center gap-2 rounded-2xl bg-child-green px-6 py-4 text-xl font-black text-text-brown shadow-[0_5px_0_#92c45e] transition-all hover:bg-[#b9e67a] active:translate-y-[5px] active:shadow-none"
+        >
+          <span className="text-2xl">＋</span> Add Scenario
+        </button>
+      </div>
+
       <div className="grid w-full max-w-6xl grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
         {scenarios.map((scenario) => (
           <div
@@ -88,6 +134,7 @@ const ManageScenario = () => {
                 alt={scenario.title}
                 fill
                 className="object-cover"
+                unoptimized
               />
             </div>
 
@@ -102,6 +149,7 @@ const ManageScenario = () => {
                     router.push({
                       pathname: "/MainSettings",
                       query: {
+                        mode: "edit",
                         scenarioId: scenario.scenarioId,
                         scenarioTitle: scenario.title,
                       },
