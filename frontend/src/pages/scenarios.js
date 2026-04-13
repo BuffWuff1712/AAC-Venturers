@@ -49,6 +49,7 @@ const ScenariosPage = () => {
   const router = useRouter();
   const [loadingScenarioId, setLoadingScenarioId] = useState("");
   const [apiScenarios, setApiScenarios] = useState([]);
+  const [childName, setChildName] = useState("AAC-Venturer");
 
   useEffect(() => {
     let isMounted = true;
@@ -68,6 +69,12 @@ const ScenariosPage = () => {
 
     loadScenarios();
 
+    const storedName = localStorage.getItem("childDisplayName");
+
+    if (storedName && storedName.trim() !== "") {
+      setChildName(storedName);
+    }
+
     return () => {
       isMounted = false;
     };
@@ -81,9 +88,9 @@ const ScenariosPage = () => {
         locationName: scenario.locationName || scenario.title || "School Canteen",
         locationImage: resolveScenarioImage(
           scenario.locationImageUrl ||
-            scenario.locationImage ||
-            scenario.settings?.location_image_url ||
-            scenario.settings?.locationImageUrl
+          scenario.locationImage ||
+          scenario.settings?.location_image_url ||
+          scenario.settings?.locationImageUrl
         ),
         description:
           scenario.description ||
@@ -179,6 +186,36 @@ const ScenariosPage = () => {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* ── THE MASCOT DOCK ── */}
+      <div className="absolute top-6 right-8 z-50 flex flex-col items-end group">
+
+        {/* Speech Bubble: Now points DOWN to the mascot */}
+        <div className="relative mb-2 max-w-[200px] transform transition-all duration-300 group-hover:-translate-y-1">
+          <div className="rounded-[22px] bg-white p-4 shadow-xl border-4 border-caregiver-peach">
+            <p className="font-fredoka text-text-brown text-center leading-tight">
+              <span className="text-lg font-black block">Hi {childName}!</span>
+              <span className="text-sm font-extrabold opacity-80">Ready to practice?</span>
+            </p>
+          </div>
+          {/* Tail pointing DOWN toward mascot */}
+          <div className="absolute -bottom-3 right-8 h-0 w-0 
+      border-l-[10px] border-l-transparent 
+      border-r-[10px] border-r-transparent 
+      border-t-[14px] border-t-caregiver-peach"
+          />
+        </div>
+
+        {/* Mascot: Smaller size (h-32) fits better in the header area */}
+        <div className="relative h-32 w-32 transition-transform duration-300 group-hover:scale-110">
+          <Image
+            src="/images/mascot.png"
+            alt="Guide"
+            fill
+            className="object-contain"
+          />
+        </div>
       </div>
     </div>
   );
