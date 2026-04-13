@@ -1,4 +1,5 @@
 import cors from "cors";
+import path from "path";
 import express from "express";
 import { authRoutes } from "./routes/authRoutes.js";
 import { caregiverRoutes } from "./routes/caregiverRoutes.js";
@@ -10,6 +11,7 @@ export const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use("/uploads", express.static(path.resolve("public/uploads")));
 
 // Lightweight health endpoint for local dev and smoke checks.
 app.get("/api/health", (req, res) => {
