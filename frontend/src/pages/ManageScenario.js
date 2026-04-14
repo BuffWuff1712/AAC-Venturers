@@ -118,7 +118,15 @@ const ManageScenario = () => {
         </p>
       </div>
 
-      <div className="mb-8 flex w-full max-w-6xl justify-end">
+      {/* Action hub for scenario management plus the new achievements mockup flow. */}
+      <div className="mb-8 flex w-full max-w-6xl flex-wrap items-center justify-end gap-3">
+        <button
+          onClick={() => router.push("/achievements")}
+          className="flex items-center justify-center gap-2 rounded-2xl bg-caregiver-peach px-6 py-4 text-xl font-black text-text-brown shadow-[0_5px_0_#e6b181] transition-all hover:bg-[#ffc891] active:translate-y-[5px] active:shadow-none"
+        >
+          Top AAC-venturers <span className="text-2xl">🏆</span>
+        </button>
+
         <button
           onClick={() =>
             router.push({
