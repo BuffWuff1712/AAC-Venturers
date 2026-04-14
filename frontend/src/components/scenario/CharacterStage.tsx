@@ -4,10 +4,11 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 
 interface CharacterStageProps {
-  characterImage: string;
+  characterImage?: string;
   characterName: string;
   speech?: string;
   isListening?: boolean;
+  isLoading?: boolean;
 }
 
 const CharacterStage: React.FC<CharacterStageProps> = ({
@@ -15,6 +16,7 @@ const CharacterStage: React.FC<CharacterStageProps> = ({
   characterName,
   speech,
   isListening = false,
+  isLoading = false,
 }) => {
   const [visible, setVisible] = useState(false);
 
@@ -65,13 +67,19 @@ const CharacterStage: React.FC<CharacterStageProps> = ({
           className={`relative transition-all duration-500 drop-shadow-2xl right-[8%]`}
           style={{ width: 300, height: 300 }}
         >
-          <Image
-            src={characterImage}
-            alt={characterName}
-            fill
-            className="object-contain object-bottom"
-            priority
-          />
+          {isLoading || !characterImage ? (
+            <div className="flex h-full w-full items-center justify-center rounded-full border-8 border-white/80 bg-white/75 shadow-inner">
+              <div className="h-24 w-24 animate-spin rounded-full border-8 border-caregiver-peach border-t-transparent" />
+            </div>
+          ) : (
+            <Image
+              src={characterImage}
+              alt={characterName}
+              fill
+              className="object-contain object-bottom"
+              priority
+            />
+          )}
         </div>
 
         {/* ── 3. NAME LABEL ─────────────────────────────────────────────── */}

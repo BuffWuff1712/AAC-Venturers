@@ -4,7 +4,14 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createSchema } from "./schema.js";
 import { seedDatabase } from "./seed.js";
-import { inferObjectiveRule } from "../data/scenarioDefaults.js";
+import {
+  DEFAULT_AI_PERSONALITY_PROMPT,
+  DEFAULT_AVATAR_IMAGE_URL,
+  DEFAULT_AVATAR_TYPE,
+  DEFAULT_HINT_DELAY_SECONDS,
+  inferObjectiveRule,
+  STUDENT_AI_PERSONALITY_PROMPT,
+} from "../data/scenarioDefaults.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,6 +42,14 @@ function ensureColumn(database, tableName, columnName, columnSql) {
 
 function runMigrations(database) {
   ensureColumn(database, "objectives", "objective_rule", "TEXT DEFAULT 'selected_item'");
+  ensureColumn(database, "scenario_settings", "avatar_type", `TEXT DEFAULT '${DEFAULT_AVATAR_TYPE}'`);
+  ensureColumn(database, "scenario_settings", "avatar_image_url", "TEXT");
+  ensureColumn(
+    database,
+    "scenario_settings",
+    "hint_delay_seconds",
+    `INTEGER DEFAULT ${DEFAULT_HINT_DELAY_SECONDS}`
+  );
 
   const objectives = database
     .prepare("SELECT objective_id, description, objective_rule FROM objectives")
@@ -52,6 +67,43 @@ function runMigrations(database) {
     }
 
     updateObjectiveRule.run(inferObjectiveRule(objective.description), objective.objective_id);
+  });
+
+  const settingsRows = database
+    .prepare(`
+      SELECT settings_id, avatar_type, avatar_image_url, hint_delay_seconds, ai_personality_prompt
+      FROM scenario_settings
+    `)
+    .all();
+
+  const updateSettings = database.prepare(`
+    UPDATE scenario_settings
+    SET avatar_type = ?, avatar_image_url = ?, hint_delay_seconds = ?, ai_personality_prompt = ?
+    WHERE settings_id = ?
+  `);
+
+  settingsRows.forEach((settings) => {
+    const normalizedAvatarType =
+      settings.avatar_type === "student" ? "student" : DEFAULT_AVATAR_TYPE;
+    const normalizedAvatarImageUrl =
+      settings.avatar_image_url ||
+      (normalizedAvatarType === "student" ? "/images/child.png" : DEFAULT_AVATAR_IMAGE_URL);
+    const normalizedPrompt =
+      settings.ai_personality_prompt ||
+      (normalizedAvatarType === "student"
+        ? STUDENT_AI_PERSONALITY_PROMPT
+        : DEFAULT_AI_PERSONALITY_PROMPT);
+    const normalizedHintDelaySeconds = Number.isFinite(Number(settings.hint_delay_seconds))
+      ? Number(settings.hint_delay_seconds)
+      : DEFAULT_HINT_DELAY_SECONDS;
+
+    updateSettings.run(
+      normalizedAvatarType,
+      normalizedAvatarImageUrl,
+      normalizedHintDelaySeconds,
+      normalizedPrompt,
+      settings.settings_id,
+    );
   });
 }
 

@@ -1,7 +1,10 @@
 import bcryptjs from "bcryptjs";
 import {
+  DEFAULT_AVATAR_IMAGE_URL,
+  DEFAULT_AVATAR_TYPE,
   DEFAULT_BACKGROUND_NOISE,
   DEFAULT_CONTINGENCIES,
+  DEFAULT_HINT_DELAY_SECONDS,
   DEFAULT_LOCATION_IMAGE_URL,
   DEFAULT_LOCATION_NAME,
   DEFAULT_AI_PERSONALITY_PROMPT,
@@ -58,7 +61,10 @@ export const scenarioSettingsSeed = {
   scenario_id: scenarioId,
   location_name: DEFAULT_LOCATION_NAME,
   location_image_url: DEFAULT_LOCATION_IMAGE_URL,
+  avatar_type: DEFAULT_AVATAR_TYPE,
+  avatar_image_url: DEFAULT_AVATAR_IMAGE_URL,
   background_noise: DEFAULT_BACKGROUND_NOISE,
+  hint_delay_seconds: DEFAULT_HINT_DELAY_SECONDS,
   ai_personality_prompt: DEFAULT_AI_PERSONALITY_PROMPT,
   contingencies: DEFAULT_CONTINGENCIES,
 };

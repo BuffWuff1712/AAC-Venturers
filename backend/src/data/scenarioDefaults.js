@@ -1,10 +1,15 @@
 export const DEFAULT_BACKGROUND_NOISE = 20;
+export const DEFAULT_HINT_DELAY_SECONDS = 5;
 export const DEFAULT_LOCATION_IMAGE_URL = "/images/western-stall.jpg";
+export const DEFAULT_AVATAR_TYPE = "store_owner";
+export const DEFAULT_AVATAR_IMAGE_URL = "/images/cook.png";
 export const DEFAULT_LOCATION_NAME = "Western Stall at School Canteen";
 export const DEFAULT_SCENARIO_DESCRIPTION =
   "Child practises ordering from a western food stall during recess.";
 export const DEFAULT_AI_PERSONALITY_PROMPT =
   "You are a friendly and patient western food stall owner at a school canteen. Be personable and familiar with the children.";
+export const STUDENT_AI_PERSONALITY_PROMPT =
+  "You are a friendly student at the same school canteen. Speak simply, encourage the child gently, and wait patiently for their response.";
 export const DEFAULT_CONTINGENCIES =
   "If the child struggles, offer to show them a menu or ask them to point to what they want.";
 export const DEFAULT_OBJECTIVE_DESCRIPTIONS = [
@@ -99,7 +104,10 @@ export function buildDefaultScenarioSettings({ scenarioId, title } = {}) {
     scenario_id: scenarioId || "",
     location_name: title || DEFAULT_LOCATION_NAME,
     location_image_url: DEFAULT_LOCATION_IMAGE_URL,
+    avatar_type: DEFAULT_AVATAR_TYPE,
+    avatar_image_url: DEFAULT_AVATAR_IMAGE_URL,
     background_noise: DEFAULT_BACKGROUND_NOISE,
+    hint_delay_seconds: DEFAULT_HINT_DELAY_SECONDS,
     ai_personality_prompt: DEFAULT_AI_PERSONALITY_PROMPT,
     contingencies: DEFAULT_CONTINGENCIES,
   };
@@ -126,10 +134,22 @@ export function mergeScenarioSettings(settings = {}, fallbackSettings = {}) {
       settings.location_image_url?.trim() ||
       fallbackSettings.location_image_url ||
       DEFAULT_LOCATION_IMAGE_URL,
+    avatar_type:
+      settings.avatar_type?.trim() || fallbackSettings.avatar_type || DEFAULT_AVATAR_TYPE,
+    avatar_image_url:
+      settings.avatar_image_url?.trim() ||
+      fallbackSettings.avatar_image_url ||
+      DEFAULT_AVATAR_IMAGE_URL,
     background_noise:
       typeof settings.background_noise === "number"
         ? settings.background_noise
         : fallbackSettings.background_noise ?? DEFAULT_BACKGROUND_NOISE,
+    hint_delay_seconds:
+      typeof settings.hint_delay_seconds === "number"
+        ? settings.hint_delay_seconds
+        : Number.isFinite(Number(settings.hint_delay_seconds))
+          ? Number(settings.hint_delay_seconds)
+          : fallbackSettings.hint_delay_seconds ?? DEFAULT_HINT_DELAY_SECONDS,
     ai_personality_prompt:
       settings.ai_personality_prompt?.trim() ||
       fallbackSettings.ai_personality_prompt ||

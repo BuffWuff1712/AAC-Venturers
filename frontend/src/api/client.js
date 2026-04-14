@@ -47,6 +47,11 @@ export function clearAuthSession() {
 async function request(path, options = {}) {
   const token = getStoredToken();
   const isFormData = options.body instanceof FormData;
+  const shouldStringifyBody =
+    !isFormData &&
+    options.body &&
+    typeof options.body !== "string" &&
+    !(options.body instanceof Blob);
 
   const headers = {
     ...(isFormData ? {} : { "Content-Type": "application/json" }),
@@ -56,6 +61,7 @@ async function request(path, options = {}) {
 
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
+    body: shouldStringifyBody ? JSON.stringify(options.body) : options.body,
     headers,
   });
 
@@ -150,6 +156,13 @@ export const api = {
     });
   },
 
+  requestChildHint(sessionId) {
+    return request(`/child/sessions/${sessionId}/hint`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  },
+
   getScenarios() {
     return this.getCaregiverScenarios();
   },
@@ -179,5 +192,8 @@ export const api = {
   },
   sendMessage(sessionId, payload) {
     return this.sendChildMessage(sessionId, payload);
+  },
+  requestHint(sessionId) {
+    return this.requestChildHint(sessionId);
   },
 };

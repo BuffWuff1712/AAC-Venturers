@@ -12,6 +12,7 @@ import {
   loadScenarioContext,
   loadSession,
 } from "../services/orchestration/contextBuilder.js";
+import { generateResponse } from "../services/orchestration/responseGenerator.js";
 
 export const childRoutes = Router();
 
@@ -78,6 +79,13 @@ function buildFallbackHint(session, context) {
     hint: "Take your time. You can answer one short phrase at a time.",
     source: "fallback",
   };
+}
+
+function normalizeHintText(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
 }
 
 // Lists the child-playable scenarios available in the prototype.
@@ -159,6 +167,9 @@ childRoutes.get("/sessions/:sessionId", (req, res, next) => {
         title: context.scenario.title,
         locationName: context.scenario.locationName,
         locationImageUrl: context.scenario.locationImageUrl,
+        avatarType: context.scenario.avatarType,
+        avatarImageUrl: context.scenario.avatarImageUrl,
+        hintDelaySeconds: context.scenario.hintDelaySeconds,
         objective: context.scenario.objective,
         objectives: context.scenario.objectives || [],
       },
@@ -185,20 +196,48 @@ childRoutes.post("/sessions/:sessionId/respond", async (req, res, next) => {
   }
 });
 
-// Returns caregiver-configured contingency guidance for a stuck moment, with a simple fallback.
-childRoutes.post("/sessions/:sessionId/hint", (req, res, next) => {
+// Returns a child-facing hint for a stuck moment, using scenario contingencies as internal guidance.
+childRoutes.post("/sessions/:sessionId/hint", async (req, res, next) => {
   try {
     const session = loadSession(req.params.sessionId);
     const context = loadScenarioContext(session.scenario_id);
     const configuredContingency = String(context.scenario.contingencies || "").trim();
+    const selectedMenu =
+      context.menu.find((item) => item.name === session.selected_item) || null;
 
-    const hintPayload = configuredContingency
-      ? {
-          action: "hint",
-          hint: configuredContingency,
-          source: "scenario_contingency",
-        }
-      : buildFallbackHint(session, context);
+    const generatedHint = await generateResponse({
+      context,
+      childMemory: null,
+      action: "hint",
+      userInput: "",
+      session,
+      selectedMenu,
+      customizations: session.selectedCustomizations || [],
+      interpretation: {
+        intent: "silence",
+        confidence: 1,
+      },
+    });
+
+    const fallbackHint = buildFallbackHint(session, context);
+    const generatedHintText = String(generatedHint?.message || "").trim();
+    const usesRawContingency =
+      normalizeHintText(generatedHintText) === normalizeHintText(configuredContingency);
+    const hintText =
+      generatedHintText && !usesRawContingency
+        ? generatedHintText
+        : fallbackHint.hint;
+    const hintPayload = {
+      action:
+        generatedHintText && !usesRawContingency
+          ? generatedHint?.action || fallbackHint.action
+          : fallbackHint.action,
+      hint: hintText,
+      source:
+        generatedHintText && !usesRawContingency
+          ? generatedHint?.source || "generated_hint"
+          : fallbackHint.source,
+    };
 
     res.json({
       sessionId: session.session_id,

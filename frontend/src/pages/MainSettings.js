@@ -10,6 +10,23 @@ const OBJECTIVE_RULE_OPTIONS = [
   { value: "payment_completed", label: "Child completes payment" },
 ];
 
+const AVATAR_OPTIONS = [
+  {
+    value: "store_owner",
+    label: "Store Owner",
+    image: "/images/cook.png",
+    prompt:
+      "You are a friendly and patient western food stall owner at a school canteen. Be personable and familiar with the children.",
+  },
+  {
+    value: "student",
+    label: "Student",
+    image: "/images/student.png",
+    prompt:
+      "You are a friendly student at the same school canteen. Speak simply, encourage the child gently, and wait patiently for their response.",
+  },
+];
+
 const ToggleRow = ({ title, enabled, onToggle, children }) => {
   return (
     <div className="rounded-[32px] border-b-8 border-gray-200 bg-white p-6 shadow-xl">
@@ -45,7 +62,10 @@ const fallbackScenario = {
   settings: {
     locationName: "Canteen",
     locationImageUrl: "/images/canteen.jpg",
+    avatarType: "student",
+    avatarImageUrl: "/images/student.png",
     backgroundNoise: 20,
+    hintDelaySeconds: 5,
     aiPersonalityPrompt:
       "You are a friendly student also queuing in the same line. Encourage the child gently and wait for their response.",
     contingencies:
@@ -76,7 +96,10 @@ const emptyScenario = {
   settings: {
     locationName: "",
     locationImageUrl: "",
+    avatarType: "store_owner",
+    avatarImageUrl: "/images/cook.png",
     backgroundNoise: 20,
+    hintDelaySeconds: 5,
     aiPersonalityPrompt: "",
     contingencies: "",
   },
@@ -84,6 +107,7 @@ const emptyScenario = {
 };
 
 const FALLBACK_LOCATION_IMAGE = "/images/canteen.jpg";
+const FALLBACK_AVATAR_IMAGE = "/images/cook.png";
 
 const BACKEND_BASE =
   process.env.NEXT_PUBLIC_API_BASE?.replace(/\/api$/, "") ||
@@ -115,6 +139,49 @@ function resolveScenarioImage(locationImage) {
   return normalizedImage;
 }
 
+function getAvatarOption(avatarType) {
+  return AVATAR_OPTIONS.find((option) => option.value === avatarType) || AVATAR_OPTIONS[0];
+}
+
+function resolveAvatarImage(avatarImage, avatarType = "store_owner") {
+  const fallbackImage = getAvatarOption(avatarType).image || FALLBACK_AVATAR_IMAGE;
+
+  if (typeof avatarImage !== "string") {
+    return fallbackImage;
+  }
+
+  const normalizedImage = avatarImage.trim();
+
+  if (!normalizedImage) {
+    return fallbackImage;
+  }
+
+  if (
+    normalizedImage.startsWith("http://") ||
+    normalizedImage.startsWith("https://") ||
+    normalizedImage.startsWith("blob:")
+  ) {
+    return normalizedImage;
+  }
+
+  if (normalizedImage.startsWith("/uploads/")) {
+    return `${BACKEND_BASE}${normalizedImage}`;
+  }
+
+  return normalizedImage;
+}
+
+function mapObjectivesForForm(objectives) {
+  if (!Array.isArray(objectives)) {
+    return [];
+  }
+
+  return objectives.map((objective) => ({
+    description: objective.description || "",
+    objectiveRule: objective.objectiveRule || "selected_item",
+  }));
+}
+
 const MainSettings = () => {
   const router = useRouter();
   const { scenarioId, scenarioTitle, mode } = router.query;
@@ -125,6 +192,7 @@ const MainSettings = () => {
   const [settings, setSettings] = useState({
     locationNameEnabled: true,
     locationImageEnabled: true,
+    avatarEnabled: true,
     objectivesEnabled: true,
     backgroundNoiseEnabled: true,
     aiPersonalityEnabled: true,
@@ -134,13 +202,17 @@ const MainSettings = () => {
   const [formData, setFormData] = useState({
     locationName: "",
     locationImage: FALLBACK_LOCATION_IMAGE,
+    avatarType: "store_owner",
+    avatarImage: FALLBACK_AVATAR_IMAGE,
     objectives: [],
     backgroundNoise: 20,
+    hintDelaySeconds: 20,
     aiPersonality: "",
     contingencies: "",
   });
 
   const [locationImageFile, setLocationImageFile] = useState(null);
+  const [avatarImageFile, setAvatarImageFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [loadedScenario, setLoadedScenario] = useState(
     isEditMode ? fallbackScenario : emptyScenario
@@ -157,12 +229,19 @@ const MainSettings = () => {
 
         setLoadedScenario(emptyScenario);
         setLocationImageFile(null);
+        setAvatarImageFile(null);
         setFormData({
-          locationName: fallbackScenario.settings.location_name,
-          locationImage: resolveScenarioImage(fallbackScenario.settings.location_image_url),
-          objectives: fallbackScenario.objectives,
-          backgroundNoise: fallbackScenario.settings.background_noise,
-          aiPersonality: fallbackScenario.settings.ai_personality_prompt,
+          locationName: fallbackScenario.settings.locationName,
+          locationImage: resolveScenarioImage(fallbackScenario.settings.locationImageUrl),
+          avatarType: fallbackScenario.settings.avatarType,
+          avatarImage: resolveAvatarImage(
+            fallbackScenario.settings.avatarImageUrl,
+            fallbackScenario.settings.avatarType
+          ),
+          objectives: mapObjectivesForForm(fallbackScenario.objectives),
+          backgroundNoise: fallbackScenario.settings.backgroundNoise,
+          hintDelaySeconds: fallbackScenario.settings.hintDelaySeconds,
+          aiPersonality: fallbackScenario.settings.aiPersonalityPrompt,
           contingencies: fallbackScenario.settings.contingencies,
         });
         return;
@@ -175,17 +254,18 @@ const MainSettings = () => {
         const nextScenario = data || fallbackScenario;
         setLoadedScenario(nextScenario);
         setLocationImageFile(null);
+        setAvatarImageFile(null);
         setFormData({
           locationName: nextScenario.settings?.locationName || "Canteen",
           locationImage: resolveScenarioImage(nextScenario.settings?.locationImageUrl),
-          objectives: Array.isArray(nextScenario.objectives)
-            ? nextScenario.objectives
-                .map((objective) => ({
-                  description: objective.description || "",
-                  objectiveRule: objective.objectiveRule || "selected_item",
-                }))
-            : [],
+          avatarType: nextScenario.settings?.avatarType || "store_owner",
+          avatarImage: resolveAvatarImage(
+            nextScenario.settings?.avatarImageUrl,
+            nextScenario.settings?.avatarType || "store_owner"
+          ),
+          objectives: mapObjectivesForForm(nextScenario.objectives),
           backgroundNoise: Number(nextScenario.settings?.backgroundNoise ?? 20),
+          hintDelaySeconds: Number(nextScenario.settings?.hintDelaySeconds ?? 5),
           aiPersonality: nextScenario.settings?.aiPersonalityPrompt || "",
           contingencies: nextScenario.settings?.contingencies || "",
         });
@@ -193,15 +273,20 @@ const MainSettings = () => {
         if (!isMounted) return;
         setLoadedScenario(fallbackScenario);
         setLocationImageFile(null);
+        setAvatarImageFile(null);
         setFormData({
           locationName: fallbackScenario.settings.locationName,
           locationImage: resolveScenarioImage(
             fallbackScenario.settings.locationImageUrl
           ),
-          objectives: fallbackScenario.objectives
-            .map((objective, index) => `${index + 1}. ${objective.description}`)
-            .join("\n"),
+          avatarType: fallbackScenario.settings.avatarType,
+          avatarImage: resolveAvatarImage(
+            fallbackScenario.settings.avatarImageUrl,
+            fallbackScenario.settings.avatarType
+          ),
+          objectives: mapObjectivesForForm(fallbackScenario.objectives),
           backgroundNoise: fallbackScenario.settings.backgroundNoise,
+          hintDelaySeconds: fallbackScenario.settings.hintDelaySeconds,
           aiPersonality: fallbackScenario.settings.aiPersonalityPrompt,
           contingencies: fallbackScenario.settings.contingencies,
         });
@@ -292,32 +377,70 @@ const MainSettings = () => {
     }));
   };
 
-  const buildObjectivesArray = () => {
-    return formData.objectives
-      .split("\n")
-      .map((line) => line.replace(/^\d+\.\s*/, "").trim())
-      .filter(Boolean);
+  const handleAvatarTypeChange = (avatarType) => {
+    const avatarOption = getAvatarOption(avatarType);
+
+    setAvatarImageFile(null);
+    setFormData((prev) => ({
+      ...prev,
+      avatarType,
+      avatarImage: avatarOption.image,
+      aiPersonality: avatarOption.prompt,
+    }));
+  };
+
+  const handleAvatarImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const previewUrl = URL.createObjectURL(file);
+
+    setAvatarImageFile(file);
+    setFormData((prev) => ({
+      ...prev,
+      avatarImage: previewUrl,
+    }));
   };
 
   const handleSave = async () => {
     setSaving(true);
 
     try {
-      if (scenarioId) {
-        await api.updateCaregiverScenarioSettings(scenarioId, {
-          locationName: formData.locationName,
-          locationImageUrl: formData.locationImage,
-          locationImage: locationImageFile,
-          objectives: formData.objectives
-            .map((objective) => ({
-              description: String(objective.description || "").trim(),
-              objectiveRule: objective.objectiveRule || "selected_item",
-            }))
-            .filter((objective) => objective.description),
-          backgroundNoise: Number(formData.backgroundNoise),
-          aiPersonalityPrompt: formData.aiPersonality,
-          contingencies: formData.contingencies,
-        });
+      const payload = new FormData();
+      const normalizedLocationName = String(formData.locationName || "").trim();
+      const normalizedObjectives = formData.objectives
+        .map((objective) => String(objective.description || "").trim())
+        .filter(Boolean);
+
+      payload.append(
+        "title",
+        normalizedLocationName || loadedScenario.scenario?.title || "New Scenario"
+      );
+      payload.append("locationName", normalizedLocationName);
+      payload.append("locationImageUrl", formData.locationImage || FALLBACK_LOCATION_IMAGE);
+      payload.append("avatarType", formData.avatarType || "store_owner");
+      payload.append(
+        "avatarImageUrl",
+        formData.avatarImage || getAvatarOption(formData.avatarType).image
+      );
+      payload.append("backgroundNoise", String(Number(formData.backgroundNoise) || 0));
+      payload.append(
+        "hintDelaySeconds",
+        String(Math.max(1, Number(formData.hintDelaySeconds) || 5))
+      );
+      payload.append("aiPersonalityPrompt", formData.aiPersonality || "");
+      payload.append("contingencies", formData.contingencies || "");
+
+      normalizedObjectives.forEach((objective) => {
+        payload.append("objectives[]", objective);
+      });
+
+      if (locationImageFile) {
+        payload.append("locationImage", locationImageFile);
+      }
+
+      if (avatarImageFile) {
+        payload.append("avatarImage", avatarImageFile);
       }
 
       if (isEditMode && scenarioId) {
@@ -438,6 +561,74 @@ const MainSettings = () => {
         </ToggleRow>
 
         <ToggleRow
+          title="Conversation Avatar"
+          enabled={settings.avatarEnabled}
+          onToggle={() => handleToggle("avatarEnabled")}
+        >
+          <label className="mb-3 block text-lg font-bold text-text-brown">
+            Choose who the child talks to
+          </label>
+
+          <div className="mb-4 grid gap-3 md:grid-cols-2">
+            {AVATAR_OPTIONS.map((option) => {
+              const selected = formData.avatarType === option.value;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleAvatarTypeChange(option.value)}
+                  className={`rounded-[28px] border-4 p-4 text-left shadow-[0_5px_0_#d1d5db] transition-all ${
+                    selected
+                      ? "border-child-green bg-green-50"
+                      : "border-white bg-white"
+                  }`}
+                >
+                  <div className="mb-3 flex items-center gap-4">
+                    <div className="relative h-20 w-20 overflow-hidden rounded-2xl bg-page-peach">
+                      <Image
+                        src={option.image}
+                        alt={option.label}
+                        fill
+                        className="object-contain"
+                        unoptimized
+                      />
+                    </div>
+                    <div>
+                      <p className="text-xl font-black text-text-brown">{option.label}</p>
+                      <p className="text-sm font-medium text-gray-500">
+                        Use {option.label.toLowerCase()} as the speaking partner
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <label className="mb-2 block text-lg font-bold text-text-brown">
+            Upload custom avatar image
+          </label>
+
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleAvatarImageUpload}
+            className="mb-4 w-full rounded-2xl border-2 border-caregiver-peach bg-white p-4 text-lg focus:outline-none file:mr-4 file:rounded-xl file:border-0 file:bg-caregiver-peach file:px-4 file:py-2 file:font-bold file:text-text-brown hover:file:bg-[#ffc891]"
+          />
+
+          <div className="relative h-64 w-full overflow-hidden rounded-[28px] border-2 border-dashed border-caregiver-peach bg-white">
+            <Image
+              src={formData.avatarImage || getAvatarOption(formData.avatarType).image}
+              alt="Avatar Preview"
+              fill
+              className="object-contain"
+              unoptimized
+            />
+          </div>
+        </ToggleRow>
+
+        <ToggleRow
           title="Objectives"
           enabled={settings.objectivesEnabled}
           onToggle={() => handleToggle("objectivesEnabled")}
@@ -544,6 +735,21 @@ const MainSettings = () => {
           enabled={settings.contingenciesEnabled}
           onToggle={() => handleToggle("contingenciesEnabled")}
         >
+          <label className="mb-2 block text-lg font-bold text-text-brown">
+            Seconds before a hint appears
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={60}
+            step={1}
+            value={formData.hintDelaySeconds}
+            onChange={(e) =>
+              handleChange("hintDelaySeconds", Math.max(1, Number(e.target.value) || 1))
+            }
+            className="mb-6 w-full rounded-2xl border-2 border-caregiver-peach p-4 text-lg focus:outline-none"
+          />
+
           <label className="mb-2 block text-lg font-bold text-text-brown">
             Add fallback rules or exception handling
           </label>

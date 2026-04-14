@@ -105,7 +105,10 @@ export function loadScenarioContext(scenarioId) {
       memoryEnabled: inferMemoryEnabled(settings.ai_personality_prompt, settings.contingencies),
       locationName: settings.location_name || scenario.title,
       locationImageUrl: settings.location_image_url || "",
+      avatarType: settings.avatar_type || "store_owner",
+      avatarImageUrl: settings.avatar_image_url || "",
       backgroundNoise: settings.background_noise ?? 20,
+      hintDelaySeconds: settings.hint_delay_seconds ?? 5,
       aiPersonalityPrompt: settings.ai_personality_prompt || "",
       contingencies: settings.contingencies || "",
       objectives: objectives.map((objective) => ({

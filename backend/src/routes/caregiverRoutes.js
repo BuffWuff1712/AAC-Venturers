@@ -34,6 +34,29 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+function getUploadedFile(req, fieldName) {
+  if (req.file?.fieldname === fieldName) {
+    return req.file;
+  }
+
+  const fileList = req.files?.[fieldName];
+  return Array.isArray(fileList) ? fileList[0] : null;
+}
+
+function normalizeImagePath(rawValue, fallbackValue) {
+  if (typeof rawValue !== "string") {
+    return fallbackValue;
+  }
+
+  const normalizedValue = rawValue.trim();
+
+  if (!normalizedValue || normalizedValue.startsWith("blob:")) {
+    return fallbackValue;
+  }
+
+  return normalizedValue;
+}
+
 /* =========================
    Mapping Helpers
 ========================= */
@@ -46,7 +69,10 @@ function mapScenarioSettings(settings) {
     scenarioId: settings.scenario_id,
     locationName: settings.location_name,
     locationImageUrl: settings.location_image_url,
+    avatarType: settings.avatar_type,
+    avatarImageUrl: settings.avatar_image_url,
     backgroundNoise: settings.background_noise,
+    hintDelaySeconds: settings.hint_delay_seconds,
     aiPersonalityPrompt: settings.ai_personality_prompt,
     contingencies: settings.contingencies,
     updatedAt: settings.updated_at,
@@ -147,13 +173,20 @@ caregiverRoutes.get("/scenarios", (req, res) => {
 ========================= */
 caregiverRoutes.post(
   "/scenarios",
-  upload.single("locationImage"),
+  upload.fields([
+    { name: "locationImage", maxCount: 1 },
+    { name: "avatarImage", maxCount: 1 },
+  ]),
   (req, res) => {
     try {
       const {
         title,
         locationName,
+        locationImageUrl: rawLocationImageUrl,
+        avatarType,
+        avatarImageUrl: rawAvatarImageUrl,
         backgroundNoise,
+        hintDelaySeconds,
         aiPersonalityPrompt,
         contingencies,
       } = req.body;
@@ -170,10 +203,17 @@ caregiverRoutes.post(
 
       const finalTitle = (title || locationName || "New Scenario").trim();
       const finalLocationName = (locationName || finalTitle).trim();
-
-      const imageUrl = req.file
-        ? `/uploads/${req.file.filename}`
-        : "/images/canteen.jpg";
+      const uploadedLocationImage = getUploadedFile(req, "locationImage");
+      const uploadedAvatarImage = getUploadedFile(req, "avatarImage");
+      const normalizedAvatarType = avatarType === "student" ? "student" : "store_owner";
+      const defaultAvatarImageUrl =
+        normalizedAvatarType === "student" ? "/images/child.png" : "/images/cook.png";
+      const imageUrl = uploadedLocationImage
+        ? `/uploads/${uploadedLocationImage.filename}`
+        : normalizeImagePath(rawLocationImageUrl, "/images/canteen.jpg");
+      const avatarImageUrl = uploadedAvatarImage
+        ? `/uploads/${uploadedAvatarImage.filename}`
+        : normalizeImagePath(rawAvatarImageUrl, defaultAvatarImageUrl);
 
       db.prepare(`
         INSERT INTO scenarios (scenario_id, title, is_active)
@@ -183,15 +223,18 @@ caregiverRoutes.post(
       db.prepare(`
         INSERT INTO scenario_settings (
           settings_id, scenario_id, location_name, location_image_url,
-          background_noise, ai_personality_prompt, contingencies
+          avatar_type, avatar_image_url, background_noise, hint_delay_seconds, ai_personality_prompt, contingencies
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         settingsId,
         scenarioId,
         finalLocationName,
         imageUrl,
+        normalizedAvatarType,
+        avatarImageUrl,
         Number(backgroundNoise ?? 20),
+        Number(hintDelaySeconds ?? 5),
         aiPersonalityPrompt || "",
         contingencies || ""
       );
@@ -256,13 +299,20 @@ caregiverRoutes.get("/scenarios/:scenarioId", (req, res) => {
 ========================= */
 caregiverRoutes.put(
   "/scenarios/:scenarioId/settings",
-  upload.single("locationImage"),
+  upload.fields([
+    { name: "locationImage", maxCount: 1 },
+    { name: "avatarImage", maxCount: 1 },
+  ]),
   (req, res) => {
     try {
       const {
         title,
         locationName,
+        locationImageUrl: rawLocationImageUrl,
+        avatarType,
+        avatarImageUrl: rawAvatarImageUrl,
         backgroundNoise,
+        hintDelaySeconds,
         aiPersonalityPrompt,
         contingencies,
       } = req.body;
@@ -292,24 +342,38 @@ caregiverRoutes.put(
 
       const existingSettings = db
         .prepare(
-          "SELECT settings_id, location_image_url FROM scenario_settings WHERE scenario_id = ?"
+          "SELECT settings_id, location_image_url, avatar_image_url FROM scenario_settings WHERE scenario_id = ?"
         )
         .get(scenarioId);
 
-      const imageUrl = req.file
-        ? `/uploads/${req.file.filename}`
-        : existingSettings?.location_image_url || "/images/canteen.jpg";
+      const uploadedLocationImage = getUploadedFile(req, "locationImage");
+      const uploadedAvatarImage = getUploadedFile(req, "avatarImage");
+      const normalizedAvatarType = avatarType === "student" ? "student" : "store_owner";
+      const defaultAvatarImageUrl =
+        normalizedAvatarType === "student" ? "/images/child.png" : "/images/cook.png";
+      const imageUrl = uploadedLocationImage
+        ? `/uploads/${uploadedLocationImage.filename}`
+        : normalizeImagePath(
+            rawLocationImageUrl,
+            existingSettings?.location_image_url || "/images/canteen.jpg"
+          );
+      const avatarImageUrl = uploadedAvatarImage
+        ? `/uploads/${uploadedAvatarImage.filename}`
+        : normalizeImagePath(rawAvatarImageUrl, defaultAvatarImageUrl);
 
       if (existingSettings) {
         db.prepare(`
           UPDATE scenario_settings
-          SET location_name = ?, location_image_url = ?, background_noise = ?,
-              ai_personality_prompt = ?, contingencies = ?, updated_at = CURRENT_TIMESTAMP
+          SET location_name = ?, location_image_url = ?, avatar_type = ?, avatar_image_url = ?, background_noise = ?,
+              hint_delay_seconds = ?, ai_personality_prompt = ?, contingencies = ?, updated_at = CURRENT_TIMESTAMP
           WHERE scenario_id = ?
         `).run(
           locationName,
           imageUrl,
+          normalizedAvatarType,
+          avatarImageUrl,
           Number(backgroundNoise ?? 20),
+          Number(hintDelaySeconds ?? 5),
           aiPersonalityPrompt || "",
           contingencies || "",
           scenarioId
@@ -319,15 +383,18 @@ caregiverRoutes.put(
         db.prepare(`
           INSERT INTO scenario_settings (
             settings_id, scenario_id, location_name, location_image_url,
-            background_noise, ai_personality_prompt, contingencies
+            avatar_type, avatar_image_url, background_noise, hint_delay_seconds, ai_personality_prompt, contingencies
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           settingsId,
           scenarioId,
           locationName,
           imageUrl,
+          normalizedAvatarType,
+          avatarImageUrl,
           Number(backgroundNoise ?? 20),
+          Number(hintDelaySeconds ?? 5),
           aiPersonalityPrompt || "",
           contingencies || ""
         );

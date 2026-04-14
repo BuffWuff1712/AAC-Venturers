@@ -11,14 +11,46 @@ import { PromptAnalytic, SessionResult, TranscriptEntry } from "../../types/scen
 
 const DEFAULT_SCENARIO_ID = "scenario-001";
 const FALLBACK_TITLE = "Canteen";
+const FALLBACK_AVATAR_IMAGE = "/images/cook.png";
 const FALLBACK_OBJECTIVES = [
   "Order at least one menu item clearly",
   "Complete the purchase interaction",
 ];
+const DEFAULT_HINT_DELAY_MS = 5_000;
 
 type ScenarioObjective = {
   description?: string;
 };
+
+function resolveAvatarImage(avatarImageUrl?: string, avatarType?: string) {
+  const fallbackImage = avatarType === "student" ? "/images/child.png" : FALLBACK_AVATAR_IMAGE;
+
+  if (typeof avatarImageUrl !== "string") {
+    return fallbackImage;
+  }
+
+  const normalizedImage = avatarImageUrl.trim();
+
+  if (!normalizedImage) {
+    return fallbackImage;
+  }
+
+  if (
+    normalizedImage.startsWith("http://") ||
+    normalizedImage.startsWith("https://") ||
+    normalizedImage.startsWith("blob:")
+  ) {
+    return normalizedImage;
+  }
+
+  if (normalizedImage.startsWith("/uploads/")) {
+    const backendBase =
+      process.env.NEXT_PUBLIC_API_BASE?.replace(/\/api$/, "") || "http://localhost:4000";
+    return `${backendBase}${normalizedImage}`;
+  }
+
+  return normalizedImage;
+}
 
 const CanteenScenario: React.FC = () => {
   const router = useRouter();
@@ -31,6 +63,9 @@ const CanteenScenario: React.FC = () => {
   const [sessionId, setSessionId] = useState("");
   const [scenarioTitle, setScenarioTitle] = useState(FALLBACK_TITLE);
   const [scenarioObjectives, setScenarioObjectives] = useState(FALLBACK_OBJECTIVES);
+  const [characterImage, setCharacterImage] = useState("");
+  const [characterLabel, setCharacterLabel] = useState("Loading");
+  const [hintDelayMs, setHintDelayMs] = useState(DEFAULT_HINT_DELAY_MS);
   const [completedObjectiveCount, setCompletedObjectiveCount] = useState(0);
   const [characterSpeech, setCharacterSpeech] = useState("Starting session...");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -97,6 +132,9 @@ const CanteenScenario: React.FC = () => {
     const startScenario = async () => {
       setIsLoadingSession(true);
       setErrorMessage("");
+      setCharacterImage("");
+      setCharacterLabel("Loading");
+      setCharacterSpeech("");
 
       try {
         const childUser = await prepareChildUser();
@@ -118,6 +156,13 @@ const CanteenScenario: React.FC = () => {
 
         setSessionId(response.sessionId || "");
         setScenarioTitle(response.scenario?.title || FALLBACK_TITLE);
+        setCharacterImage(
+          resolveAvatarImage(response.scenario?.avatarImageUrl, response.scenario?.avatarType)
+        );
+        setCharacterLabel(response.scenario?.avatarType === "student" ? "Student" : "Stall Owner");
+        setHintDelayMs(
+          Math.max(1, Number(response.scenario?.hintDelaySeconds) || 5) * 1000
+        );
         setScenarioObjectives(
           Array.isArray(response.scenario?.objectives) && response.scenario.objectives.length
             ? response.scenario.objectives.map((objective: ScenarioObjective) => objective.description || "")
@@ -129,7 +174,7 @@ const CanteenScenario: React.FC = () => {
         );
 
         if (openingMessage?.message) {
-          addEntry("friend", "Stall Owner", openingMessage.message);
+          addEntry("friend", response.scenario?.avatarType === "student" ? "Student" : "Stall Owner", openingMessage.message);
         }
 
         promptStartRef.current = Date.now();
@@ -191,7 +236,7 @@ const CanteenScenario: React.FC = () => {
         setAnalytics((prev) => [...prev, nextAnalytic]);
 
         if (response?.message) {
-          addEntry("friend", "Stall Owner", response.message);
+          addEntry("friend", characterLabel, response.message);
           setCharacterSpeech(response.message);
         }
 
@@ -220,7 +265,7 @@ const CanteenScenario: React.FC = () => {
                 ? [
                   {
                     speaker: "friend" as const,
-                    label: "Stall Owner",
+                    label: characterLabel,
                     text: response.message,
                     timestamp: Date.now(),
                   },
@@ -272,6 +317,7 @@ const CanteenScenario: React.FC = () => {
       router,
       scenarioDone,
       scenarioTitle,
+      characterLabel,
       sessionId,
       startCountdown,
       stopCountdown,
@@ -279,6 +325,22 @@ const CanteenScenario: React.FC = () => {
       transcript,
     ]
   );
+
+  const handleNoSpeech = useCallback(async () => {
+    if (!sessionId || isSubmitting || scenarioDone || isLoadingSession) {
+      return;
+    }
+
+    try {
+      const response = await api.requestChildHint(sessionId);
+      if (response?.hint) {
+        addEntry("friend", characterLabel, response.hint);
+        setCharacterSpeech(response.hint);
+      }
+    } catch (err) {
+      console.error("Unable to request hint:", err);
+    }
+  }, [addEntry, characterLabel, isLoadingSession, isSubmitting, scenarioDone, sessionId]);
 
   useEffect(() => {
     return () => {
@@ -297,9 +359,9 @@ const CanteenScenario: React.FC = () => {
 
     return (
       scenarioObjectives[Math.min(completedObjectiveCount, Math.max(scenarioObjectives.length - 1, 0))] ||
-      "Listen carefully and respond to the stall owner."
+      `Listen carefully and respond to the ${characterLabel.toLowerCase()}.`
     );
-  }, [completedObjectiveCount, errorMessage, isLoadingSession, scenarioObjectives]);
+  }, [characterLabel, completedObjectiveCount, errorMessage, isLoadingSession, scenarioObjectives]);
 
   const handleRestart = useCallback(() => {
     // Clear everything
@@ -350,10 +412,11 @@ const CanteenScenario: React.FC = () => {
 
         <div className="flex flex-1 items-center justify-center">
           <CharacterStage
-            characterImage="/images/student.png"
-            characterName={scenarioTitle}
+            characterImage={characterImage}
+            characterName={characterLabel}
             speech={characterSpeech}
             isListening={isRecording}
+            isLoading={isLoadingSession}
           />
         </div>
 
@@ -362,6 +425,8 @@ const CanteenScenario: React.FC = () => {
             <RecordingIndicator
               isRecording={isRecording && !scenarioDone && !isLoadingSession}
               onTranscript={handleTranscript}
+              onNoSpeech={handleNoSpeech}
+              silenceTimeoutMs={hintDelayMs}
               onStop={() => {
                 setIsRecording(false);
                 stopCountdown();
