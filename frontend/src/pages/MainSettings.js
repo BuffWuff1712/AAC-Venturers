@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import Image from "next/image";
 import { api } from "@/api/client";
@@ -12,14 +12,12 @@ const ToggleRow = ({ title, enabled, onToggle, children }) => {
         <button
           type="button"
           onClick={onToggle}
-          className={`relative h-12 w-24 rounded-full transition-all ${
-            enabled ? "bg-child-green" : "bg-gray-300"
-          }`}
+          className={`relative h-12 w-24 rounded-full transition-all ${enabled ? "bg-child-green" : "bg-gray-300"
+            }`}
         >
           <span
-            className={`absolute top-1.5 h-9 w-9 rounded-full bg-white shadow-md transition-all ${
-              enabled ? "left-[54px]" : "left-1.5"
-            }`}
+            className={`absolute top-1.5 h-9 w-9 rounded-full bg-white shadow-md transition-all ${enabled ? "left-[54px]" : "left-1.5"
+              }`}
           />
         </button>
       </div>
@@ -109,6 +107,9 @@ const MainSettings = () => {
   const router = useRouter();
   const { scenarioId, scenarioTitle, mode } = router.query;
 
+  const previewAudioRef = useRef(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+
   const isEditMode = mode === "edit" || Boolean(scenarioId);
   const isAddMode = mode === "add" || !scenarioId;
 
@@ -135,6 +136,43 @@ const MainSettings = () => {
   const [loadedScenario, setLoadedScenario] = useState(
     isEditMode ? fallbackScenario : emptyScenario
   );
+
+  // Cleanup audio when component unmounts
+  useEffect(() => {
+    return () => {
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        previewAudioRef.current = null;
+      }
+    };
+  }, []);
+
+  const togglePreview = () => {
+    if (isPreviewing) {
+      previewAudioRef.current?.pause();
+      setIsPreviewing(false);
+      return;
+    }
+
+    // Initialize audio if it doesn't exist
+    if (!previewAudioRef.current) {
+      previewAudioRef.current = new Audio("/audio/canteen_bg.mp3");
+      previewAudioRef.current.loop = true;
+    }
+
+    // Set volume based on current formData selection (0-30 scale to 0.0-0.3)
+    previewAudioRef.current.volume = formData.backgroundNoise / 100;
+
+    previewAudioRef.current.play();
+    setIsPreviewing(true);
+  };
+
+  // Also update volume in real-time if they change the dropdown while playing
+  useEffect(() => {
+    if (previewAudioRef.current && isPreviewing) {
+      previewAudioRef.current.volume = formData.backgroundNoise / 100;
+    }
+  }, [formData.backgroundNoise, isPreviewing]);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -175,11 +213,11 @@ const MainSettings = () => {
           ),
           objectives: Array.isArray(nextScenario.objectives)
             ? nextScenario.objectives
-                .map(
-                  (objective, index) =>
-                    `${index + 1}. ${objective.description || ""}`
-                )
-                .join("\n")
+              .map(
+                (objective, index) =>
+                  `${index + 1}. ${objective.description || ""}`
+              )
+              .join("\n")
             : "",
           backgroundNoise: Number(nextScenario.settings?.backgroundNoise ?? 20),
           aiPersonality: nextScenario.settings?.aiPersonalityPrompt || "",
@@ -428,18 +466,33 @@ const MainSettings = () => {
           <label className="mb-2 block text-lg font-bold text-text-brown">
             Select noise level
           </label>
-          <select
-            value={formData.backgroundNoise}
-            onChange={(e) =>
-              handleChange("backgroundNoise", Number(e.target.value))
-            }
-            className="w-full rounded-2xl border-2 border-caregiver-peach p-4 text-lg focus:outline-none"
-          >
-            <option value={0}>No background noise</option>
-            <option value={10}>Low ambient noise</option>
-            <option value={20}>Medium crowd noise</option>
-            <option value={30}>High crowd noise</option>
-          </select>
+          <div className="mt-4 flex items-center gap-4">
+            <select
+              value={formData.backgroundNoise}
+              onChange={(e) => handleChange("backgroundNoise", Number(e.target.value))}
+              className="flex-1 rounded-2xl border-4 border-caregiver-peach/20 bg-white p-4 text-lg font-bold text-text-brown outline-none transition-all focus:border-caregiver-peach"
+            >
+              <option value={0}>No background noise</option>
+              <option value={10}>Low ambient noise</option>
+              <option value={20}>Medium crowd noise</option>
+              <option value={30}>High crowd noise</option>
+            </select>
+
+            <button
+              type="button"
+              onClick={togglePreview}
+              className={`
+      flex items-center gap-3 px-8 py-3 rounded-2xl font-black text-xl transition-all active:scale-95
+      ${isPreviewing
+                  ? "bg-red-500 text-white shadow-[0_6px_0_#c24141] animate-pulse"
+                  : "bg-caregiver-peach text-text-brown shadow-[0_6px_0_#e6b181] hover:brightness-105"
+                }
+    `}
+            >
+              <span>{isPreviewing ? "Stop" : "Preview"}</span>
+              <span className="text-2xl">{isPreviewing ? "⏹️" : "🔊"}</span>
+            </button>
+          </div>
         </ToggleRow>
 
         <ToggleRow
