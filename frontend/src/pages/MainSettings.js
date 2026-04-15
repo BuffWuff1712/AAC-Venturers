@@ -25,7 +25,17 @@ const AVATAR_OPTIONS = [
     prompt:
       "You are a friendly student at the same school canteen. Speak simply, encourage the child gently, and wait patiently for their response.",
   },
+  {
+    value: "teacher",
+    label: "Teacher",
+    image: "/images/teacher.png",
+    prompt:
+      "You are a kind and attentive teacher in a school setting. Speak clearly, support the child warmly, and guide the conversation patiently.",
+  },
 ];
+
+const CUSTOM_AVATAR_TYPE = "custom";
+const CUSTOM_CHARACTER_STORAGE_KEY = "aacventurers-custom-characters";
 
 const ToggleRow = ({ title, enabled, onToggle, children }) => {
   return (
@@ -61,6 +71,7 @@ const fallbackScenario = {
     locationName: "Canteen",
     locationImageUrl: "/images/canteen.jpg",
     avatarType: "student",
+    avatarLabel: "Student",
     avatarImageUrl: "/images/student.png",
     backgroundNoise: 20,
     hintDelaySeconds: 5,
@@ -95,6 +106,7 @@ const emptyScenario = {
     locationName: "",
     locationImageUrl: "",
     avatarType: "store_owner",
+    avatarLabel: "Store Owner",
     avatarImageUrl: "/images/cook.png",
     backgroundNoise: 20,
     hintDelaySeconds: 5,
@@ -139,6 +151,63 @@ function resolveScenarioImage(locationImage) {
 
 function getAvatarOption(avatarType) {
   return AVATAR_OPTIONS.find((option) => option.value === avatarType) || AVATAR_OPTIONS[0];
+}
+
+function buildCustomAvatarPrompt(avatarLabel) {
+  const normalizedLabel = String(avatarLabel || "").trim() || "custom character";
+  return `You are ${normalizedLabel}. Speak clearly, stay in character, and support the child with a warm and patient tone.`;
+}
+
+function createCustomCharacterId(avatarLabel) {
+  const slug = String(avatarLabel || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return slug ? `custom-${slug}` : `custom-${Date.now()}`;
+}
+
+function normalizeStoredCustomCharacters(rawValue) {
+  if (!Array.isArray(rawValue)) {
+    return [];
+  }
+
+  return rawValue
+    .map((character) => {
+      const avatarLabel = String(character?.avatarLabel || character?.label || "").trim();
+      const avatarImage = String(character?.avatarImage || character?.image || "").trim();
+
+      if (!avatarLabel || !avatarImage) {
+        return null;
+      }
+
+      return {
+        id: String(character?.id || createCustomCharacterId(avatarLabel)),
+        avatarType: CUSTOM_AVATAR_TYPE,
+        avatarLabel,
+        avatarImage,
+        prompt: buildCustomAvatarPrompt(avatarLabel),
+      };
+    })
+    .filter(Boolean);
+}
+
+function findMatchingCustomCharacter(characters, avatarLabel, avatarImage) {
+  const normalizedLabel = String(avatarLabel || "").trim().toLowerCase();
+  const normalizedImage = String(avatarImage || "").trim();
+
+  if (!normalizedLabel || !normalizedImage) {
+    return null;
+  }
+
+  return (
+    characters.find(
+      (character) =>
+        character.avatarLabel.toLowerCase() === normalizedLabel &&
+        character.avatarImage === normalizedImage
+    ) || null
+  );
 }
 
 function resolveAvatarImage(avatarImage, avatarType = "store_owner") {
@@ -204,6 +273,8 @@ const MainSettings = () => {
     locationName: "",
     locationImage: FALLBACK_LOCATION_IMAGE,
     avatarType: "store_owner",
+    avatarLabel: "Store Owner",
+    avatarPresetId: "store_owner",
     avatarImage: FALLBACK_AVATAR_IMAGE,
     objectives: [],
     backgroundNoise: 20,
@@ -214,6 +285,11 @@ const MainSettings = () => {
 
   const [locationImageFile, setLocationImageFile] = useState(null);
   const [avatarImageFile, setAvatarImageFile] = useState(null);
+  const [customCharacters, setCustomCharacters] = useState([]);
+  const [customAvatarDraft, setCustomAvatarDraft] = useState({
+    avatarLabel: "",
+    avatarImage: "",
+  });
   const [saving, setSaving] = useState(false);
   const [loadedScenario, setLoadedScenario] = useState(
     isEditMode ? fallbackScenario : emptyScenario
@@ -228,6 +304,62 @@ const MainSettings = () => {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const storedCharacters = JSON.parse(
+        window.localStorage.getItem(CUSTOM_CHARACTER_STORAGE_KEY) || "[]"
+      );
+      setCustomCharacters(normalizeStoredCustomCharacters(storedCharacters));
+    } catch {
+      setCustomCharacters([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (formData.avatarType !== CUSTOM_AVATAR_TYPE) {
+      return;
+    }
+
+    const avatarLabel = String(formData.avatarLabel || customAvatarDraft.avatarLabel || "").trim();
+    const avatarImage = String(formData.avatarImage || customAvatarDraft.avatarImage || "").trim();
+
+    if (!avatarLabel || !avatarImage) {
+      return;
+    }
+
+    const existingCharacter = findMatchingCustomCharacter(
+      customCharacters,
+      avatarLabel,
+      avatarImage
+    );
+
+    if (existingCharacter) {
+      if (formData.avatarPresetId !== existingCharacter.id) {
+        setFormData((prev) => ({
+          ...prev,
+          avatarPresetId: existingCharacter.id,
+        }));
+      }
+    } else if (formData.avatarPresetId !== CUSTOM_AVATAR_TYPE) {
+      setFormData((prev) => ({
+        ...prev,
+        avatarPresetId: CUSTOM_AVATAR_TYPE,
+      }));
+    }
+  }, [
+    customAvatarDraft.avatarImage,
+    customAvatarDraft.avatarLabel,
+    customCharacters,
+    formData.avatarImage,
+    formData.avatarLabel,
+    formData.avatarPresetId,
+    formData.avatarType,
+  ]);
 
   const togglePreview = () => {
     if (isPreviewing) {
@@ -272,6 +404,8 @@ const MainSettings = () => {
           locationName: fallbackScenario.settings.locationName,
           locationImage: resolveScenarioImage(fallbackScenario.settings.locationImageUrl),
           avatarType: fallbackScenario.settings.avatarType,
+          avatarLabel: fallbackScenario.settings.avatarLabel || getAvatarOption(fallbackScenario.settings.avatarType).label,
+          avatarPresetId: fallbackScenario.settings.avatarType,
           avatarImage: resolveAvatarImage(
             fallbackScenario.settings.avatarImageUrl,
             fallbackScenario.settings.avatarType
@@ -281,6 +415,10 @@ const MainSettings = () => {
           hintDelaySeconds: fallbackScenario.settings.hintDelaySeconds,
           aiPersonality: fallbackScenario.settings.aiPersonalityPrompt,
           contingencies: fallbackScenario.settings.contingencies,
+        });
+        setCustomAvatarDraft({
+          avatarLabel: "",
+          avatarImage: "",
         });
         return;
       }
@@ -297,26 +435,31 @@ const MainSettings = () => {
           locationName: nextScenario.settings?.locationName || "Canteen",
           locationImage: resolveScenarioImage(nextScenario.settings?.locationImageUrl),
           avatarType: nextScenario.settings?.avatarType || "store_owner",
+          avatarLabel:
+            nextScenario.settings?.avatarLabel ||
+            getAvatarOption(nextScenario.settings?.avatarType || "store_owner").label,
+          avatarPresetId:
+            nextScenario.settings?.avatarType === CUSTOM_AVATAR_TYPE
+              ? CUSTOM_AVATAR_TYPE
+              : nextScenario.settings?.avatarType || "store_owner",
           avatarImage: resolveAvatarImage(
             nextScenario.settings?.avatarImageUrl,
             nextScenario.settings?.avatarType || "store_owner"
           ),
-<<<<<<< HEAD
           objectives: mapObjectivesForForm(nextScenario.objectives),
-=======
-          objectives: Array.isArray(nextScenario.objectives)
-            ? nextScenario.objectives
-              .map(
-                (objective, index) =>
-                  `${index + 1}. ${objective.description || ""}`
-              )
-              .join("\n")
-            : "",
->>>>>>> 44d2be73946bee75dcb1975b36e2b61d097e48d8
           backgroundNoise: Number(nextScenario.settings?.backgroundNoise ?? 20),
           hintDelaySeconds: Number(nextScenario.settings?.hintDelaySeconds ?? 5),
           aiPersonality: nextScenario.settings?.aiPersonalityPrompt || "",
           contingencies: nextScenario.settings?.contingencies || "",
+        });
+        setCustomAvatarDraft({
+          avatarLabel: nextScenario.settings?.avatarType === CUSTOM_AVATAR_TYPE
+            ? nextScenario.settings?.avatarLabel || ""
+            : "",
+          avatarImage:
+            nextScenario.settings?.avatarType === CUSTOM_AVATAR_TYPE
+              ? resolveAvatarImage(nextScenario.settings?.avatarImageUrl, CUSTOM_AVATAR_TYPE)
+              : "",
         });
       } catch {
         if (!isMounted) return;
@@ -329,6 +472,8 @@ const MainSettings = () => {
             fallbackScenario.settings.locationImageUrl
           ),
           avatarType: fallbackScenario.settings.avatarType,
+          avatarLabel: fallbackScenario.settings.avatarLabel || getAvatarOption(fallbackScenario.settings.avatarType).label,
+          avatarPresetId: fallbackScenario.settings.avatarType,
           avatarImage: resolveAvatarImage(
             fallbackScenario.settings.avatarImageUrl,
             fallbackScenario.settings.avatarType
@@ -338,6 +483,10 @@ const MainSettings = () => {
           hintDelaySeconds: fallbackScenario.settings.hintDelaySeconds,
           aiPersonality: fallbackScenario.settings.aiPersonalityPrompt,
           contingencies: fallbackScenario.settings.contingencies,
+        });
+        setCustomAvatarDraft({
+          avatarLabel: "",
+          avatarImage: "",
         });
       }
     };
@@ -433,8 +582,14 @@ const MainSettings = () => {
     setFormData((prev) => ({
       ...prev,
       avatarType,
+      avatarLabel: avatarOption.label,
+      avatarPresetId: avatarType,
       avatarImage: avatarOption.image,
       aiPersonality: avatarOption.prompt,
+    }));
+    setCustomAvatarDraft((prev) => ({
+      avatarLabel: avatarType === CUSTOM_AVATAR_TYPE ? prev.avatarLabel : "",
+      avatarImage: avatarType === CUSTOM_AVATAR_TYPE ? prev.avatarImage : "",
     }));
   };
 
@@ -442,13 +597,107 @@ const MainSettings = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const previewUrl = URL.createObjectURL(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const previewUrl = typeof reader.result === "string" ? reader.result : "";
 
-    setAvatarImageFile(file);
+      setAvatarImageFile(file);
+      setFormData((prev) => ({
+        ...prev,
+        avatarType: CUSTOM_AVATAR_TYPE,
+        avatarPresetId: CUSTOM_AVATAR_TYPE,
+        avatarImage: previewUrl,
+      }));
+      setCustomAvatarDraft((prev) => ({
+        ...prev,
+        avatarImage: previewUrl,
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const persistCustomCharacters = (nextCharacters) => {
+    setCustomCharacters(nextCharacters);
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        CUSTOM_CHARACTER_STORAGE_KEY,
+        JSON.stringify(nextCharacters)
+      );
+    }
+  };
+
+  const handleCustomAvatarDraftChange = (value) => {
+    setCustomAvatarDraft((prev) => ({
+      ...prev,
+      avatarLabel: value,
+    }));
     setFormData((prev) => ({
       ...prev,
-      avatarImage: previewUrl,
+      avatarType: CUSTOM_AVATAR_TYPE,
+      avatarLabel: value,
+      avatarPresetId: CUSTOM_AVATAR_TYPE,
+      aiPersonality: buildCustomAvatarPrompt(value),
     }));
+  };
+
+  const handleUseSavedCustomCharacter = (character) => {
+    setAvatarImageFile(null);
+    setCustomAvatarDraft({
+      avatarLabel: character.avatarLabel,
+      avatarImage: character.avatarImage,
+    });
+    setFormData((prev) => ({
+      ...prev,
+      avatarType: CUSTOM_AVATAR_TYPE,
+      avatarLabel: character.avatarLabel,
+      avatarPresetId: character.id,
+      avatarImage: character.avatarImage,
+      aiPersonality: buildCustomAvatarPrompt(character.avatarLabel),
+    }));
+  };
+
+  const handleSaveCustomCharacter = () => {
+    const avatarLabel = String(customAvatarDraft.avatarLabel || formData.avatarLabel || "").trim();
+    const avatarImage = String(customAvatarDraft.avatarImage || formData.avatarImage || "").trim();
+
+    if (!avatarLabel || !avatarImage) {
+      alert("Add a custom character name/role and photo before saving it to memory.");
+      return;
+    }
+
+    const nextCharacter = {
+      id: createCustomCharacterId(avatarLabel),
+      avatarType: CUSTOM_AVATAR_TYPE,
+      avatarLabel,
+      avatarImage,
+      prompt: buildCustomAvatarPrompt(avatarLabel),
+    };
+    const existingCharacters = customCharacters.filter(
+      (character) => character.avatarLabel.toLowerCase() !== avatarLabel.toLowerCase()
+    );
+    const nextCharacters = [...existingCharacters, nextCharacter];
+
+    persistCustomCharacters(nextCharacters);
+    handleUseSavedCustomCharacter(nextCharacter);
+  };
+
+  const handleDeleteCustomCharacter = (characterId) => {
+    const nextCharacters = customCharacters.filter(
+      (character) => character.id !== characterId
+    );
+
+    persistCustomCharacters(nextCharacters);
+
+    if (
+      formData.avatarType === CUSTOM_AVATAR_TYPE &&
+      formData.avatarPresetId === characterId
+    ) {
+      setFormData((prev) => ({
+        ...prev,
+        avatarPresetId: CUSTOM_AVATAR_TYPE,
+      }));
+    }
   };
 
   const handleSave = async () => {
@@ -469,8 +718,15 @@ const MainSettings = () => {
       payload.append("locationImageUrl", formData.locationImage || FALLBACK_LOCATION_IMAGE);
       payload.append("avatarType", formData.avatarType || "store_owner");
       payload.append(
+        "avatarLabel",
+        String(formData.avatarLabel || getAvatarOption(formData.avatarType).label || "Store Owner").trim()
+      );
+      payload.append(
         "avatarImageUrl",
-        formData.avatarImage || getAvatarOption(formData.avatarType).image
+        formData.avatarImage ||
+          (formData.avatarType === CUSTOM_AVATAR_TYPE
+            ? customAvatarDraft.avatarImage
+            : getAvatarOption(formData.avatarType).image)
       );
       payload.append("backgroundNoise", String(Number(formData.backgroundNoise) || 0));
       payload.append(
@@ -496,6 +752,28 @@ const MainSettings = () => {
         await api.updateCaregiverScenarioSettings(scenarioId, payload);
       } else {
         await api.createCaregiverScenario(payload);
+      }
+
+      if (formData.avatarType === CUSTOM_AVATAR_TYPE) {
+        const avatarLabel = String(formData.avatarLabel || "").trim();
+        const avatarImage = String(formData.avatarImage || "").trim();
+
+        if (avatarLabel && avatarImage) {
+          const nextCharacter = {
+            id:
+              formData.avatarPresetId && formData.avatarPresetId !== CUSTOM_AVATAR_TYPE
+                ? formData.avatarPresetId
+                : createCustomCharacterId(avatarLabel),
+            avatarType: CUSTOM_AVATAR_TYPE,
+            avatarLabel,
+            avatarImage,
+            prompt: buildCustomAvatarPrompt(avatarLabel),
+          };
+          const existingCharacters = customCharacters.filter(
+            (character) => character.id !== nextCharacter.id
+          );
+          persistCustomCharacters([...existingCharacters, nextCharacter]);
+        }
       }
 
       alert(
@@ -618,9 +896,10 @@ const MainSettings = () => {
             Choose who the child talks to
           </label>
 
-          <div className="mb-4 grid gap-3 md:grid-cols-2">
+          <div className="mb-4 grid gap-3 md:grid-cols-3">
             {AVATAR_OPTIONS.map((option) => {
-              const selected = formData.avatarType === option.value;
+              const selected =
+                formData.avatarType === option.value && formData.avatarPresetId === option.value;
 
               return (
                 <button
@@ -655,6 +934,78 @@ const MainSettings = () => {
             })}
           </div>
 
+          {customCharacters.length ? (
+            <>
+              <label className="mb-3 block text-lg font-bold text-text-brown">
+                Saved custom characters
+              </label>
+
+              <div className="mb-6 grid gap-3 md:grid-cols-2">
+                {customCharacters.map((character) => {
+                  const selected =
+                    formData.avatarType === CUSTOM_AVATAR_TYPE &&
+                    formData.avatarPresetId === character.id;
+
+                  return (
+                    <div
+                      key={character.id}
+                      className={`rounded-[28px] border-4 p-4 shadow-[0_5px_0_#d1d5db] transition-all ${
+                        selected
+                          ? "border-child-green bg-green-50"
+                          : "border-white bg-white"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleUseSavedCustomCharacter(character)}
+                        className="w-full text-left"
+                      >
+                        <div className="mb-3 flex items-center gap-4">
+                          <div className="relative h-20 w-20 overflow-hidden rounded-2xl bg-page-peach">
+                            <Image
+                              src={character.avatarImage}
+                              alt={character.avatarLabel}
+                              fill
+                              className="object-contain"
+                              unoptimized
+                            />
+                          </div>
+                          <div>
+                            <p className="text-xl font-black text-text-brown">
+                              {character.avatarLabel}
+                            </p>
+                            <p className="text-sm font-medium text-gray-500">
+                              Saved for reuse
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCustomCharacter(character.id)}
+                        className="rounded-xl bg-white px-4 py-2 text-sm font-black text-text-brown shadow-[0_3px_0_#d1d5db]"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : null}
+
+          <label className="mb-2 block text-lg font-bold text-text-brown">
+            Add your own character name or role
+          </label>
+          <input
+            type="text"
+            value={customAvatarDraft.avatarLabel}
+            onChange={(e) => handleCustomAvatarDraftChange(e.target.value)}
+            placeholder="e.g. Form Teacher, Librarian, Bus Captain"
+            className="mb-4 w-full rounded-2xl border-2 border-caregiver-peach p-4 text-lg focus:outline-none"
+          />
+
           <label className="mb-2 block text-lg font-bold text-text-brown">
             Upload custom avatar image
           </label>
@@ -666,9 +1017,22 @@ const MainSettings = () => {
             className="mb-4 w-full rounded-2xl border-2 border-caregiver-peach bg-white p-4 text-lg focus:outline-none file:mr-4 file:rounded-xl file:border-0 file:bg-caregiver-peach file:px-4 file:py-2 file:font-bold file:text-text-brown hover:file:bg-[#ffc891]"
           />
 
+          <button
+            type="button"
+            onClick={handleSaveCustomCharacter}
+            className="mb-4 rounded-2xl bg-white px-6 py-3 text-lg font-black text-text-brown shadow-[0_4px_0_#d1d5db]"
+          >
+            Save Custom Character To Memory
+          </button>
+
           <div className="relative h-64 w-full overflow-hidden rounded-[28px] border-2 border-dashed border-caregiver-peach bg-white">
             <Image
-              src={formData.avatarImage || getAvatarOption(formData.avatarType).image}
+              src={
+                formData.avatarImage ||
+                (formData.avatarType === CUSTOM_AVATAR_TYPE
+                  ? customAvatarDraft.avatarImage || FALLBACK_AVATAR_IMAGE
+                  : getAvatarOption(formData.avatarType).image)
+              }
               alt="Avatar Preview"
               fill
               className="object-contain"

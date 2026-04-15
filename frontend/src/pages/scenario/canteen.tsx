@@ -18,12 +18,40 @@ const FALLBACK_OBJECTIVES = [
 ];
 const DEFAULT_HINT_DELAY_MS = 5_000;
 
+function getAvatarFallbackImage(avatarType?: string) {
+  if (avatarType === "student") {
+    return "/images/student.png";
+  }
+
+  if (avatarType === "teacher") {
+    return "/images/teacher.png";
+  }
+
+  return FALLBACK_AVATAR_IMAGE;
+}
+
+function getAvatarLabel(avatarType?: string, avatarLabel?: string) {
+  if (typeof avatarLabel === "string" && avatarLabel.trim()) {
+    return avatarLabel.trim();
+  }
+
+  if (avatarType === "student") {
+    return "Student";
+  }
+
+  if (avatarType === "teacher") {
+    return "Teacher";
+  }
+
+  return "Stall Owner";
+}
+
 type ScenarioObjective = {
   description?: string;
 };
 
 function resolveAvatarImage(avatarImageUrl?: string, avatarType?: string) {
-  const fallbackImage = avatarType === "student" ? "/images/child.png" : FALLBACK_AVATAR_IMAGE;
+  const fallbackImage = getAvatarFallbackImage(avatarType);
 
   if (typeof avatarImageUrl !== "string") {
     return fallbackImage;
@@ -174,7 +202,9 @@ const CanteenScenario: React.FC = () => {
         setCharacterImage(
           resolveAvatarImage(response.scenario?.avatarImageUrl, response.scenario?.avatarType)
         );
-        setCharacterLabel(response.scenario?.avatarType === "student" ? "Student" : "Stall Owner");
+        setCharacterLabel(
+          getAvatarLabel(response.scenario?.avatarType, response.scenario?.avatarLabel)
+        );
         setHintDelayMs(
           Math.max(1, Number(response.scenario?.hintDelaySeconds) || 5) * 1000
         );
@@ -189,7 +219,11 @@ const CanteenScenario: React.FC = () => {
         );
 
         if (openingMessage?.message) {
-          addEntry("friend", response.scenario?.avatarType === "student" ? "Student" : "Stall Owner", openingMessage.message);
+          addEntry(
+            "friend",
+            getAvatarLabel(response.scenario?.avatarType, response.scenario?.avatarLabel),
+            openingMessage.message
+          );
         }
 
         promptStartRef.current = Date.now();

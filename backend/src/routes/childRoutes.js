@@ -168,6 +168,7 @@ childRoutes.get("/sessions/:sessionId", (req, res, next) => {
         locationName: context.scenario.locationName,
         locationImageUrl: context.scenario.locationImageUrl,
         avatarType: context.scenario.avatarType,
+        avatarLabel: context.scenario.avatarLabel,
         avatarImageUrl: context.scenario.avatarImageUrl,
         hintDelaySeconds: context.scenario.hintDelaySeconds,
         objective: context.scenario.objective,

@@ -5,7 +5,9 @@ import fs from "fs";
 import { db } from "../db/database.js";
 import { getAnalyticsSummary } from "../services/orchestration/sessionTracker.js";
 import {
+  buildCustomAvatarPrompt,
   buildDefaultScenarioSettings,
+  getAvatarDefaults,
   mergeObjectives,
   mergeScenarioSettings,
   normalizeObjectives,
@@ -57,6 +59,26 @@ function normalizeImagePath(rawValue, fallbackValue) {
   return normalizedValue;
 }
 
+function normalizeAvatarSelection(rawAvatarType, rawAvatarLabel, rawAvatarImageUrl) {
+  const avatarDefaults = getAvatarDefaults(rawAvatarType, rawAvatarLabel);
+  const normalizedAvatarType = avatarDefaults.avatarType;
+  const normalizedAvatarLabel = String(rawAvatarLabel || "").trim() || avatarDefaults.avatarLabel;
+  const defaultAvatarImageUrl = avatarDefaults.avatarImageUrl;
+  const avatarImageUrl = normalizeImagePath(rawAvatarImageUrl, defaultAvatarImageUrl);
+  const aiPersonalityPrompt =
+    normalizedAvatarType === "custom"
+      ? buildCustomAvatarPrompt(normalizedAvatarLabel)
+      : avatarDefaults.aiPersonalityPrompt;
+
+  return {
+    normalizedAvatarType,
+    normalizedAvatarLabel,
+    defaultAvatarImageUrl,
+    avatarImageUrl,
+    aiPersonalityPrompt,
+  };
+}
+
 /* =========================
    Mapping Helpers
 ========================= */
@@ -70,6 +92,7 @@ function mapScenarioSettings(settings) {
     locationName: settings.location_name,
     locationImageUrl: settings.location_image_url,
     avatarType: settings.avatar_type,
+    avatarLabel: settings.avatar_label,
     avatarImageUrl: settings.avatar_image_url,
     backgroundNoise: settings.background_noise,
     hintDelaySeconds: settings.hint_delay_seconds,
@@ -184,6 +207,7 @@ caregiverRoutes.post(
         locationName,
         locationImageUrl: rawLocationImageUrl,
         avatarType,
+        avatarLabel,
         avatarImageUrl: rawAvatarImageUrl,
         backgroundNoise,
         hintDelaySeconds,
@@ -205,15 +229,17 @@ caregiverRoutes.post(
       const finalLocationName = (locationName || finalTitle).trim();
       const uploadedLocationImage = getUploadedFile(req, "locationImage");
       const uploadedAvatarImage = getUploadedFile(req, "avatarImage");
-      const normalizedAvatarType = avatarType === "student" ? "student" : "store_owner";
-      const defaultAvatarImageUrl =
-        normalizedAvatarType === "student" ? "/images/child.png" : "/images/cook.png";
+      const avatarSelection = normalizeAvatarSelection(
+        avatarType,
+        avatarLabel,
+        rawAvatarImageUrl,
+      );
       const imageUrl = uploadedLocationImage
         ? `/uploads/${uploadedLocationImage.filename}`
         : normalizeImagePath(rawLocationImageUrl, "/images/canteen.jpg");
       const avatarImageUrl = uploadedAvatarImage
         ? `/uploads/${uploadedAvatarImage.filename}`
-        : normalizeImagePath(rawAvatarImageUrl, defaultAvatarImageUrl);
+        : avatarSelection.avatarImageUrl;
 
       db.prepare(`
         INSERT INTO scenarios (scenario_id, title, is_active)
@@ -223,19 +249,20 @@ caregiverRoutes.post(
       db.prepare(`
         INSERT INTO scenario_settings (
           settings_id, scenario_id, location_name, location_image_url,
-          avatar_type, avatar_image_url, background_noise, hint_delay_seconds, ai_personality_prompt, contingencies
+          avatar_type, avatar_label, avatar_image_url, background_noise, hint_delay_seconds, ai_personality_prompt, contingencies
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         settingsId,
         scenarioId,
         finalLocationName,
         imageUrl,
-        normalizedAvatarType,
+        avatarSelection.normalizedAvatarType,
+        avatarSelection.normalizedAvatarLabel,
         avatarImageUrl,
         Number(backgroundNoise ?? 20),
         Number(hintDelaySeconds ?? 5),
-        aiPersonalityPrompt || "",
+        aiPersonalityPrompt || avatarSelection.aiPersonalityPrompt || "",
         contingencies || ""
       );
 
@@ -310,6 +337,7 @@ caregiverRoutes.put(
         locationName,
         locationImageUrl: rawLocationImageUrl,
         avatarType,
+        avatarLabel,
         avatarImageUrl: rawAvatarImageUrl,
         backgroundNoise,
         hintDelaySeconds,
@@ -342,15 +370,17 @@ caregiverRoutes.put(
 
       const existingSettings = db
         .prepare(
-          "SELECT settings_id, location_image_url, avatar_image_url FROM scenario_settings WHERE scenario_id = ?"
+          "SELECT settings_id, location_image_url, avatar_label, avatar_image_url FROM scenario_settings WHERE scenario_id = ?"
         )
         .get(scenarioId);
 
       const uploadedLocationImage = getUploadedFile(req, "locationImage");
       const uploadedAvatarImage = getUploadedFile(req, "avatarImage");
-      const normalizedAvatarType = avatarType === "student" ? "student" : "store_owner";
-      const defaultAvatarImageUrl =
-        normalizedAvatarType === "student" ? "/images/child.png" : "/images/cook.png";
+      const avatarSelection = normalizeAvatarSelection(
+        avatarType,
+        avatarLabel || existingSettings?.avatar_label,
+        rawAvatarImageUrl,
+      );
       const imageUrl = uploadedLocationImage
         ? `/uploads/${uploadedLocationImage.filename}`
         : normalizeImagePath(
@@ -359,22 +389,23 @@ caregiverRoutes.put(
           );
       const avatarImageUrl = uploadedAvatarImage
         ? `/uploads/${uploadedAvatarImage.filename}`
-        : normalizeImagePath(rawAvatarImageUrl, defaultAvatarImageUrl);
+        : normalizeImagePath(rawAvatarImageUrl, avatarSelection.defaultAvatarImageUrl);
 
       if (existingSettings) {
         db.prepare(`
           UPDATE scenario_settings
-          SET location_name = ?, location_image_url = ?, avatar_type = ?, avatar_image_url = ?, background_noise = ?,
+          SET location_name = ?, location_image_url = ?, avatar_type = ?, avatar_label = ?, avatar_image_url = ?, background_noise = ?,
               hint_delay_seconds = ?, ai_personality_prompt = ?, contingencies = ?, updated_at = CURRENT_TIMESTAMP
           WHERE scenario_id = ?
         `).run(
           locationName,
           imageUrl,
-          normalizedAvatarType,
+          avatarSelection.normalizedAvatarType,
+          avatarSelection.normalizedAvatarLabel,
           avatarImageUrl,
           Number(backgroundNoise ?? 20),
           Number(hintDelaySeconds ?? 5),
-          aiPersonalityPrompt || "",
+          aiPersonalityPrompt || avatarSelection.aiPersonalityPrompt || "",
           contingencies || "",
           scenarioId
         );
@@ -383,19 +414,20 @@ caregiverRoutes.put(
         db.prepare(`
           INSERT INTO scenario_settings (
             settings_id, scenario_id, location_name, location_image_url,
-            avatar_type, avatar_image_url, background_noise, hint_delay_seconds, ai_personality_prompt, contingencies
+            avatar_type, avatar_label, avatar_image_url, background_noise, hint_delay_seconds, ai_personality_prompt, contingencies
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           settingsId,
           scenarioId,
           locationName,
           imageUrl,
-          normalizedAvatarType,
+          avatarSelection.normalizedAvatarType,
+          avatarSelection.normalizedAvatarLabel,
           avatarImageUrl,
           Number(backgroundNoise ?? 20),
           Number(hintDelaySeconds ?? 5),
-          aiPersonalityPrompt || "",
+          aiPersonalityPrompt || avatarSelection.aiPersonalityPrompt || "",
           contingencies || ""
         );
       }

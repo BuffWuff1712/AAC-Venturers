@@ -8,6 +8,7 @@ import {
   DEFAULT_LOCATION_IMAGE_URL,
   DEFAULT_LOCATION_NAME,
   DEFAULT_AI_PERSONALITY_PROMPT,
+  DEFAULT_AVATAR_LABEL,
   DEFAULT_OBJECTIVES,
 } from "./scenarioDefaults.js";
 
@@ -62,6 +63,7 @@ export const scenarioSettingsSeed = {
   location_name: DEFAULT_LOCATION_NAME,
   location_image_url: DEFAULT_LOCATION_IMAGE_URL,
   avatar_type: DEFAULT_AVATAR_TYPE,
+  avatar_label: DEFAULT_AVATAR_LABEL,
   avatar_image_url: DEFAULT_AVATAR_IMAGE_URL,
   background_noise: DEFAULT_BACKGROUND_NOISE,
   hint_delay_seconds: DEFAULT_HINT_DELAY_SECONDS,

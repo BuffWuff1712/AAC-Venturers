@@ -106,6 +106,7 @@ export function loadScenarioContext(scenarioId) {
       locationName: settings.location_name || scenario.title,
       locationImageUrl: settings.location_image_url || "",
       avatarType: settings.avatar_type || "store_owner",
+      avatarLabel: settings.avatar_label || "Store Owner",
       avatarImageUrl: settings.avatar_image_url || "",
       backgroundNoise: settings.background_noise ?? 20,
       hintDelaySeconds: settings.hint_delay_seconds ?? 5,

@@ -3,6 +3,7 @@ export const DEFAULT_HINT_DELAY_SECONDS = 5;
 export const DEFAULT_LOCATION_IMAGE_URL = "/images/western-stall.jpg";
 export const DEFAULT_AVATAR_TYPE = "store_owner";
 export const DEFAULT_AVATAR_IMAGE_URL = "/images/cook.png";
+export const DEFAULT_AVATAR_LABEL = "Store Owner";
 export const DEFAULT_LOCATION_NAME = "Western Stall at School Canteen";
 export const DEFAULT_SCENARIO_DESCRIPTION =
   "Child practises ordering from a western food stall during recess.";
@@ -10,6 +11,8 @@ export const DEFAULT_AI_PERSONALITY_PROMPT =
   "You are a friendly and patient western food stall owner at a school canteen. Be personable and familiar with the children.";
 export const STUDENT_AI_PERSONALITY_PROMPT =
   "You are a friendly student at the same school canteen. Speak simply, encourage the child gently, and wait patiently for their response.";
+export const TEACHER_AI_PERSONALITY_PROMPT =
+  "You are a kind and attentive teacher in a school setting. Speak clearly, support the child warmly, and guide the conversation patiently.";
 export const DEFAULT_CONTINGENCIES =
   "If the child struggles, offer to show them a menu or ask them to point to what they want.";
 export const DEFAULT_OBJECTIVE_DESCRIPTIONS = [
@@ -38,6 +41,54 @@ export const DEFAULT_OBJECTIVES = [
     objective_rule: OBJECTIVE_RULES.payment_completed,
   },
 ];
+
+export const AVATAR_DEFAULTS = {
+  store_owner: {
+    type: "store_owner",
+    label: "Store Owner",
+    image: "/images/cook.png",
+    prompt: DEFAULT_AI_PERSONALITY_PROMPT,
+  },
+  student: {
+    type: "student",
+    label: "Student",
+    image: "/images/student.png",
+    prompt: STUDENT_AI_PERSONALITY_PROMPT,
+  },
+  teacher: {
+    type: "teacher",
+    label: "Teacher",
+    image: "/images/teacher.png",
+    prompt: TEACHER_AI_PERSONALITY_PROMPT,
+  },
+  custom: {
+    type: "custom",
+    label: "Custom Character",
+    image: DEFAULT_AVATAR_IMAGE_URL,
+    prompt: DEFAULT_AI_PERSONALITY_PROMPT,
+  },
+};
+
+export function getAvatarDefaults(avatarType = DEFAULT_AVATAR_TYPE, avatarLabel = "") {
+  const normalizedType = AVATAR_DEFAULTS[avatarType] ? avatarType : DEFAULT_AVATAR_TYPE;
+  const preset = AVATAR_DEFAULTS[normalizedType];
+  const normalizedLabel = String(avatarLabel || "").trim() || preset.label;
+
+  return {
+    avatarType: normalizedType,
+    avatarLabel: normalizedLabel,
+    avatarImageUrl: preset.image,
+    aiPersonalityPrompt:
+      normalizedType === "custom"
+        ? buildCustomAvatarPrompt(normalizedLabel)
+        : preset.prompt,
+  };
+}
+
+export function buildCustomAvatarPrompt(avatarLabel = "custom character") {
+  const normalizedLabel = String(avatarLabel || "").trim() || "custom character";
+  return `You are ${normalizedLabel}. Speak clearly, stay in character, and support the child with a warm and patient tone.`;
+}
 
 export function inferObjectiveRule(description = "") {
   const normalized = String(description || "").toLowerCase();
@@ -99,16 +150,19 @@ export function normalizeObjectiveDescriptions(objectives = []) {
 }
 
 export function buildDefaultScenarioSettings({ scenarioId, title } = {}) {
+  const avatarDefaults = getAvatarDefaults();
+
   return {
     settings_id: `settings-${scenarioId || "default"}`,
     scenario_id: scenarioId || "",
     location_name: title || DEFAULT_LOCATION_NAME,
     location_image_url: DEFAULT_LOCATION_IMAGE_URL,
-    avatar_type: DEFAULT_AVATAR_TYPE,
-    avatar_image_url: DEFAULT_AVATAR_IMAGE_URL,
+    avatar_type: avatarDefaults.avatarType,
+    avatar_label: avatarDefaults.avatarLabel,
+    avatar_image_url: avatarDefaults.avatarImageUrl,
     background_noise: DEFAULT_BACKGROUND_NOISE,
     hint_delay_seconds: DEFAULT_HINT_DELAY_SECONDS,
-    ai_personality_prompt: DEFAULT_AI_PERSONALITY_PROMPT,
+    ai_personality_prompt: avatarDefaults.aiPersonalityPrompt,
     contingencies: DEFAULT_CONTINGENCIES,
   };
 }
@@ -125,6 +179,15 @@ export function buildDefaultObjectives(scenarioId) {
 }
 
 export function mergeScenarioSettings(settings = {}, fallbackSettings = {}) {
+  const fallbackAvatarDefaults = getAvatarDefaults(
+    fallbackSettings.avatar_type,
+    fallbackSettings.avatar_label,
+  );
+  const currentAvatarDefaults = getAvatarDefaults(
+    settings.avatar_type || fallbackAvatarDefaults.avatarType,
+    settings.avatar_label || fallbackAvatarDefaults.avatarLabel,
+  );
+
   return {
     ...fallbackSettings,
     ...settings,
@@ -135,11 +198,16 @@ export function mergeScenarioSettings(settings = {}, fallbackSettings = {}) {
       fallbackSettings.location_image_url ||
       DEFAULT_LOCATION_IMAGE_URL,
     avatar_type:
-      settings.avatar_type?.trim() || fallbackSettings.avatar_type || DEFAULT_AVATAR_TYPE,
+      currentAvatarDefaults.avatarType,
+    avatar_label:
+      settings.avatar_label?.trim() ||
+      fallbackSettings.avatar_label ||
+      currentAvatarDefaults.avatarLabel ||
+      DEFAULT_AVATAR_LABEL,
     avatar_image_url:
       settings.avatar_image_url?.trim() ||
       fallbackSettings.avatar_image_url ||
-      DEFAULT_AVATAR_IMAGE_URL,
+      currentAvatarDefaults.avatarImageUrl,
     background_noise:
       typeof settings.background_noise === "number"
         ? settings.background_noise
@@ -153,7 +221,7 @@ export function mergeScenarioSettings(settings = {}, fallbackSettings = {}) {
     ai_personality_prompt:
       settings.ai_personality_prompt?.trim() ||
       fallbackSettings.ai_personality_prompt ||
-      DEFAULT_AI_PERSONALITY_PROMPT,
+      currentAvatarDefaults.aiPersonalityPrompt,
     contingencies:
       settings.contingencies?.trim() ||
       fallbackSettings.contingencies ||

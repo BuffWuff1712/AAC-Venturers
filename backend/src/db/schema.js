@@ -42,6 +42,7 @@ export function createSchema(db) {
       location_name TEXT,
       location_image_url TEXT,
       avatar_type TEXT DEFAULT 'store_owner',
+      avatar_label TEXT DEFAULT 'Store Owner',
       avatar_image_url TEXT,
       background_noise INTEGER DEFAULT 20,
       hint_delay_seconds INTEGER DEFAULT 5,

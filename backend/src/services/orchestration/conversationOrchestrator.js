@@ -244,6 +244,7 @@ export async function startConversation({ scenarioId, childId }) {
       title: context.scenario.title,
       locationName: context.scenario.locationName,
       avatarType: context.scenario.avatarType,
+      avatarLabel: context.scenario.avatarLabel,
       avatarImageUrl: context.scenario.avatarImageUrl,
       hintDelaySeconds: context.scenario.hintDelaySeconds,
       objective: context.scenario.objective,
