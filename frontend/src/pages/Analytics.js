@@ -41,7 +41,7 @@ const emptyAnalytics = {
 
 const Analytics = () => {
   const router = useRouter();
-  const { sessionId, scenarioTitle } = router.query;
+  const { sessionId, scenarioId, scenarioTitle } = router.query;
   const [sessionDetails, setSessionDetails] = useState(null);
   const [sessionAnalytics, setSessionAnalytics] = useState(emptyAnalytics);
 
@@ -170,7 +170,15 @@ const Analytics = () => {
   return (
     <div className="min-h-screen bg-page-peach p-6 font-fredoka">
       <button
-        onClick={() => router.push("/History")}
+        onClick={() =>
+          router.push({
+            pathname: "/History",
+            query: {
+              scenarioId,
+              scenarioTitle,
+            },
+          })
+        }
         className="mb-8 flex items-center gap-2 rounded-2xl bg-white px-6 py-3 font-black text-text-brown shadow-[0_4px_0_#e5e7eb] transition-all hover:translate-y-[4px] hover:shadow-none active:scale-95"
       >
         <span className="text-2xl">←</span> Back

@@ -321,6 +321,100 @@ caregiverRoutes.get("/scenarios/:scenarioId", (req, res) => {
 });
 
 /* =========================
+   GET Scenario History
+========================= */
+caregiverRoutes.get("/scenarios/:scenarioId/history", (req, res) => {
+  try {
+    const scenario = db
+      .prepare("SELECT scenario_id FROM scenarios WHERE scenario_id = ?")
+      .get(req.params.scenarioId);
+
+    if (!scenario) {
+      return res.status(404).json({ message: "Scenario not found" });
+    }
+
+    const sessions = db
+      .prepare(`
+        SELECT
+          s.session_id,
+          s.child_id,
+          c.name AS child_name,
+          s.start_time,
+          s.end_time,
+          s.total_questions,
+          s.successful_first_attempts,
+          s.xp_earned
+        FROM sessions s
+        LEFT JOIN children c ON c.child_id = s.child_id
+        WHERE s.scenario_id = ?
+        ORDER BY s.start_time DESC, s.session_id DESC
+      `)
+      .all(req.params.scenarioId);
+
+    res.json(sessions.map(mapScenarioHistorySession));
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch scenario history" });
+  }
+});
+
+/* =========================
+   GET Session Analytics
+========================= */
+caregiverRoutes.get("/sessions/:sessionId/analytics", (req, res) => {
+  try {
+    const session = db
+      .prepare("SELECT session_id FROM sessions WHERE session_id = ?")
+      .get(req.params.sessionId);
+
+    if (!session) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    const analytics = db
+      .prepare(`
+        SELECT
+          avg_response_time,
+          longest_response_time,
+          shortest_response_time,
+          success_rate
+        FROM session_analytics
+        WHERE session_id = ?
+      `)
+      .get(req.params.sessionId);
+
+    const responseRows = db
+      .prepare(`
+        SELECT r.response_time_seconds
+        FROM responses r
+        INNER JOIN interactions i ON i.interaction_id = r.interaction_id
+        WHERE i.session_id = ? AND r.response_time_seconds IS NOT NULL
+        ORDER BY r.created_at, r.response_id
+      `)
+      .all(req.params.sessionId)
+      .map((row) => Number(row.response_time_seconds || 0))
+      .filter((value) => value > 0);
+
+    const avgResponseTime = analytics?.avg_response_time ?? 0;
+    const longestResponseTime =
+      analytics?.longest_response_time ??
+      (responseRows.length ? Math.max(...responseRows) : 0);
+    const shortestResponseTime =
+      analytics?.shortest_response_time ??
+      (responseRows.length ? Math.min(...responseRows) : 0);
+    const successRate = analytics?.success_rate ?? 0;
+
+    res.json({
+      avgResponseTime,
+      longestResponseTime,
+      shortestResponseTime,
+      successRate,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch session analytics" });
+  }
+});
+
+/* =========================
    UPDATE Scenario
    FIXED: Objectives now persist
 ========================= */

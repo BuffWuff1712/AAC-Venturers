@@ -104,9 +104,18 @@ function upsertSessionAnalytics({ sessionId, state, totalQuestions }) {
 /**
  * Creates a new session row to track one child practice run from start to finish.
  */
-export function createSession({ scenarioId, childId }) {
+export function createSession({ scenarioId, childId, childName = "" }) {
   const sessionId = randomUUID();
   const now = new Date().toISOString();
+  const normalizedChildName = String(childName || "").trim();
+
+  if (normalizedChildName) {
+    db.prepare(`
+      UPDATE children
+      SET name = ?
+      WHERE child_id = ?
+    `).run(normalizedChildName, childId);
+  }
 
   db.prepare(`
     INSERT INTO sessions (session_id, child_id, scenario_id, start_time)

@@ -131,8 +131,12 @@ childRoutes.get("/scenarios", (req, res) => {
 // Creates a new practice session and returns the opening assistant message.
 childRoutes.post("/sessions", async (req, res, next) => {
   try {
-    const { scenarioId, childId } = req.body;
-    const session = await startConversation({ scenarioId, childId: childId || "unknown" });
+    const { scenarioId, childId, childName } = req.body;
+    const session = await startConversation({
+      scenarioId,
+      childId: childId || "unknown",
+      childName: childName || "",
+    });
     res.status(201).json(session);
   } catch (error) {
     next(error);
@@ -190,6 +194,7 @@ childRoutes.post("/sessions/:sessionId/respond", async (req, res, next) => {
       sessionId: req.params.sessionId,
       userInput: req.body.input || "",
       inputMode: req.body.inputMode || "text",
+      responseTimeMs: Number(req.body.responseTimeMs || 0),
     });
     res.json(result);
   } catch (error) {

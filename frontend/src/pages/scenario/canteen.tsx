@@ -167,6 +167,10 @@ const CanteenScenario: React.FC = () => {
 
       try {
         const childUser = await prepareChildUser();
+        const storedChildDisplayName =
+          typeof window !== "undefined"
+            ? window.localStorage.getItem("childDisplayName") || ""
+            : "";
         const scenarioId =
           typeof router.query.scenarioId === "string" && router.query.scenarioId
             ? router.query.scenarioId
@@ -175,6 +179,7 @@ const CanteenScenario: React.FC = () => {
         const response = await api.startChildSession({
           scenarioId,
           childId: childUser.childId,
+          childName: storedChildDisplayName.trim(),
         });
 
         // ─── LINKING THE VOLUME HERE ───
@@ -296,6 +301,7 @@ const CanteenScenario: React.FC = () => {
         const response = await api.sendChildMessage(sessionId, {
           input: text,
           inputMode: "text",
+          responseTimeMs: responseMs,
         });
 
         const nextAnalytic: PromptAnalytic = {

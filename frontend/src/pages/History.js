@@ -69,15 +69,17 @@ const History = () => {
   const sessions = useMemo(
     () =>
       practiceSessions.map((session, index) => {
-        const formatted = formatDateTime(session.start_time);
+        const formatted = formatDateTime(session.startTime);
+        const sessionNumber = practiceSessions.length - index;
 
         return {
-          id: session.session_id,
-          label: `Session #${index + 1}`,
+          id: session.sessionId,
+          label: `Session #${sessionNumber}`,
+          childName: session.childName || "Sample Child",
           date: formatted.date,
           time: formatted.time,
-          duration: formatDuration(session.start_time, session.end_time),
-          result: session.end_time ? "Completed" : "Incomplete",
+          duration: formatDuration(session.startTime, session.endTime),
+          result: session.endTime ? "Completed" : "Incomplete",
         };
       }),
     [practiceSessions]
@@ -139,7 +141,10 @@ const History = () => {
                       {session.label}
                     </h3>
                     <p className="mt-1 text-lg font-medium text-gray-600">
-                      {session.date} • {session.time}
+                      {session.date} | {session.time}
+                    </p>
+                    <p className="mt-1 text-base font-bold text-text-brown/70">
+                      Child: {session.childName}
                     </p>
                   </div>
 

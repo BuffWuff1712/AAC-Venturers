@@ -91,8 +91,13 @@ function buildSessionStatePatch(state, interpretation, action, metrics = {}) {
   };
 }
 
-async function processTurn({ sessionId, userInput = "", inputMode = "text", includeChildMessage }) {
-  const startedAt = Date.now();
+async function processTurn({
+  sessionId,
+  userInput = "",
+  inputMode = "text",
+  includeChildMessage,
+  responseTimeMs = 0,
+}) {
   const session = loadSession(sessionId);
   const context = loadScenarioContext(session.scenario_id);
   const childMemory = loadChildMemory(
@@ -108,7 +113,7 @@ async function processTurn({ sessionId, userInput = "", inputMode = "text", incl
         interactionId: latestInteractionId,
         responseText: userInput,
         inputMode,
-        responseTimeSeconds: 0,
+        responseTimeSeconds: Number(responseTimeMs || 0) / 1000,
         usedPrompt: false,
         isSuccessful: false,
       });
@@ -175,7 +180,7 @@ async function processTurn({ sessionId, userInput = "", inputMode = "text", incl
     ),
   });
 
-  const responseTimeMs = includeChildMessage ? Date.now() - startedAt : 0;
+  const measuredResponseTimeMs = includeChildMessage ? Number(responseTimeMs || 0) : 0;
   const assistantInteractionId = addInteraction({
     sessionId,
     questionText: validated.message,
@@ -184,7 +189,7 @@ async function processTurn({ sessionId, userInput = "", inputMode = "text", incl
       source: validated.source,
       orderSummary: validated.orderSummary,
       interpretation,
-      responseTimeMs,
+      responseTimeMs: measuredResponseTimeMs,
     },
   });
 
@@ -203,7 +208,7 @@ async function processTurn({ sessionId, userInput = "", inputMode = "text", incl
       hintsUsed,
       clarificationCount,
     }),
-    responseTimeMs,
+    responseTimeMs: measuredResponseTimeMs,
     objectiveCompleted,
     clarificationIncrement: policy.signals.needsClarification ? 1 : 0,
     hintIncrement: validated.hintUsed ? 1 : 0,
@@ -229,8 +234,8 @@ async function processTurn({ sessionId, userInput = "", inputMode = "text", incl
   };
 }
 
-export async function startConversation({ scenarioId, childId }) {
-  const sessionId = createSession({ scenarioId, childId });
+export async function startConversation({ scenarioId, childId, childName }) {
+  const sessionId = createSession({ scenarioId, childId, childName });
   const context = loadScenarioContext(scenarioId);
   const result = await processTurn({
     sessionId,
@@ -267,11 +272,17 @@ export async function startConversation({ scenarioId, childId }) {
   };
 }
 
-export async function handleConversationTurn({ sessionId, userInput, inputMode = "text" }) {
+export async function handleConversationTurn({
+  sessionId,
+  userInput,
+  inputMode = "text",
+  responseTimeMs = 0,
+}) {
   return processTurn({
     sessionId,
     userInput,
     inputMode,
     includeChildMessage: true,
+    responseTimeMs,
   });
 }
