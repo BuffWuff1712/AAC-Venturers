@@ -99,7 +99,7 @@ const Home = () => {
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
             <div className="w-full max-w-sm animate-in zoom-in rounded-[40px] bg-white p-10 shadow-2xl duration-200">
               <h2 className="mb-6 text-center text-3xl font-bold text-text-brown">
-                Caregiver Login
+                Therapist Login
               </h2>
 
               <form onSubmit={handleCaregiverLogin} className="flex flex-col gap-4">
@@ -143,7 +143,7 @@ const Home = () => {
                   }}
                   className="mt-2 text-lg font-bold text-gray-400 hover:text-text-brown"
                 >
-                  ← Not a Caregiver? Go back
+                  ← Not a Therapist? Go back
                 </button>
               </form>
             </div>
