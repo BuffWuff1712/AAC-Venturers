@@ -60,18 +60,18 @@ export function seedDatabase(db) {
   const insertSettings = db.prepare(`
     INSERT OR IGNORE INTO scenario_settings (
       settings_id, scenario_id, location_name, location_image_url,
-      background_noise, ai_personality_prompt, contingencies
+      avatar_type, avatar_label, avatar_image_url, background_noise, hint_delay_seconds, ai_personality_prompt, contingencies
     )
     VALUES (@settings_id, @scenario_id, @location_name, @location_image_url,
-            @background_noise, @ai_personality_prompt, @contingencies)
+            @avatar_type, @avatar_label, @avatar_image_url, @background_noise, @hint_delay_seconds, @ai_personality_prompt, @contingencies)
   `);
 
   insertSettings.run(scenarioSettingsSeed);
 
   // Insert objectives
   const insertObjective = db.prepare(`
-    INSERT OR IGNORE INTO objectives (objective_id, scenario_id, description, position, is_required)
-    VALUES (@objective_id, @scenario_id, @description, @position, @is_required)
+    INSERT OR IGNORE INTO objectives (objective_id, scenario_id, description, objective_rule, position, is_required)
+    VALUES (@objective_id, @scenario_id, @description, @objective_rule, @position, @is_required)
   `);
 
   objectivesSeed.forEach((objective) => {

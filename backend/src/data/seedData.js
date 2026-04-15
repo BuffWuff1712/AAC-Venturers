@@ -1,4 +1,16 @@
 import bcryptjs from "bcryptjs";
+import {
+  DEFAULT_AVATAR_IMAGE_URL,
+  DEFAULT_AVATAR_TYPE,
+  DEFAULT_BACKGROUND_NOISE,
+  DEFAULT_CONTINGENCIES,
+  DEFAULT_HINT_DELAY_SECONDS,
+  DEFAULT_LOCATION_IMAGE_URL,
+  DEFAULT_LOCATION_NAME,
+  DEFAULT_AI_PERSONALITY_PROMPT,
+  DEFAULT_AVATAR_LABEL,
+  DEFAULT_OBJECTIVES,
+} from "./scenarioDefaults.js";
 
 // Stable IDs for seed data - using strings instead of randomUUID for reproducibility
 export const caregiverId = "caregiver-001";
@@ -48,25 +60,31 @@ export const scenarioSeed = {
 export const scenarioSettingsSeed = {
   settings_id: settingsId,
   scenario_id: scenarioId,
-  location_name: "Western Stall at School Canteen",
-  location_image_url: "/images/western-stall.jpg",
-  background_noise: 20,
-  ai_personality_prompt: "You are a friendly and patient western food stall owner at a school canteen. Be personable and familiar with the children.",
-  contingencies: "If the child struggles, offer to show them a menu or ask them to point to what they want.",
+  location_name: DEFAULT_LOCATION_NAME,
+  location_image_url: DEFAULT_LOCATION_IMAGE_URL,
+  avatar_type: DEFAULT_AVATAR_TYPE,
+  avatar_label: DEFAULT_AVATAR_LABEL,
+  avatar_image_url: DEFAULT_AVATAR_IMAGE_URL,
+  background_noise: DEFAULT_BACKGROUND_NOISE,
+  hint_delay_seconds: DEFAULT_HINT_DELAY_SECONDS,
+  ai_personality_prompt: DEFAULT_AI_PERSONALITY_PROMPT,
+  contingencies: DEFAULT_CONTINGENCIES,
 };
 
 export const objectivesSeed = [
   {
     objective_id: objective1Id,
     scenario_id: scenarioId,
-    description: "Order at least one menu item clearly",
+    description: DEFAULT_OBJECTIVES[0].description,
+    objective_rule: DEFAULT_OBJECTIVES[0].objective_rule,
     position: 1,
     is_required: 1,
   },
   {
     objective_id: objective2Id,
     scenario_id: scenarioId,
-    description: "Complete the purchase interaction",
+    description: DEFAULT_OBJECTIVES[1].description,
+    objective_rule: DEFAULT_OBJECTIVES[1].objective_rule,
     position: 2,
     is_required: 1,
   },

@@ -30,6 +30,7 @@ const allowedActions = new Set([
   "small_talk",
   "repeat",
   "rephrase",
+  "free_response",
 
   // Edge cases
   "handle_silence",

@@ -5,6 +5,33 @@ function dedupe(values = []) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function toAddOnLabel(item = "") {
+  return item ? `add ${item}` : "";
+}
+
+function removeMatchingCustomizations(customizations = [], interpretation = {}) {
+  const removedPreferences = new Set(interpretation.removedPreferences || []);
+  const removedAddOnLabel = interpretation.removedAddOnItem
+    ? toAddOnLabel(interpretation.removedAddOnItem)
+    : "";
+
+  return customizations.filter((value) => {
+    if (!value) {
+      return false;
+    }
+
+    if (removedPreferences.has(value)) {
+      return false;
+    }
+
+    if (removedAddOnLabel && value === removedAddOnLabel) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
 /**
  * Splits a stored favourite-order string into its item and remembered customization parts.
  */
@@ -39,27 +66,44 @@ export function buildConversationState({ session, interpretation, childMemory })
     interpretation.item &&
     session.selected_item &&
     interpretation.item !== session.selected_item;
+  const changeFollowUpContext = session.last_action === "follow_up";
+  const addOnRequested =
+    Boolean(interpretation.addOnRequested) ||
+    (switchingItems && !interpretation.changeOrderRequested && !changeFollowUpContext);
 
   const selectedItem =
     correctionWithoutNewItem
       ? session.selected_item || ""
       :
-    (acceptingUsual ? favourite.item : "") ||
+    addOnRequested
+      ? session.selected_item || ""
+      : (acceptingUsual ? favourite.item : "") ||
     interpretation.item ||
     session.selected_item ||
     "";
 
   const selectedCustomizations = dedupe(
-    acceptingUsual
+    removeMatchingCustomizations(
+      acceptingUsual
       ? favourite.preferences
       : correctionWithoutNewItem
         ? []
+      : addOnRequested
+        ? [
+            ...(session.selectedCustomizations || []).filter((value) => value !== "no customisations"),
+            toAddOnLabel(interpretation.item),
+            ...(interpretation.preferences || []),
+          ]
       : switchingItems
         ? [...(interpretation.preferences || [])]
         : [...(session.selectedCustomizations || []), ...(interpretation.preferences || [])],
+      interpretation,
+    ),
   );
 
-  const noCustomizations = interpretation.declineCustomization || selectedCustomizations.includes("no customisations");
+  const noCustomizations =
+    !addOnRequested &&
+    (interpretation.declineCustomization || selectedCustomizations.includes("no customisations"));
   const effectiveCustomizations = noCustomizations
     ? ["no customisations"]
     : selectedCustomizations.filter((value) => value !== "no customisations");
@@ -74,6 +118,8 @@ export function buildConversationState({ session, interpretation, childMemory })
     orderCompleted,
     acceptingUsual,
     noCustomizations,
+    addOnRequested,
+    addedItem: addOnRequested ? interpretation.item : "",
     favouriteOrder: childMemory?.favouriteOrder || "",
     lastAction: session.last_action || "",
   };

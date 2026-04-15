@@ -21,14 +21,17 @@ import {
 
 function buildFallbackResponse(action, selectedMenu, customizations, context) {
   const fullMenuList = context.menu.map((item) => item.name).join(", ");
+  const joinedCustomizations = customizations?.length
+    ? ` with ${customizations.join(", ")}`
+    : "";
   const fallbackMessages = {
     greet: "Hi there! What would you like from the western stall today?",
     list_menu: `We have ${fullMenuList}. What would you like?`,
     clarify: "Please tell me which food item you want.",
     ask_customization: "Any changes for that item? You can also say no customisations.",
     offer_add_on: "Would you like a drink or fries with that?",
-    confirm_order: `Okay! ${selectedMenu?.name || "Your order"}. Is that correct?`,
-    request_payment: `Please pay when ready for ${selectedMenu?.name || "your order"}. You can say "I paid" after that.`,
+    confirm_order: `Okay! ${selectedMenu?.name || "Your order"}${joinedCustomizations}. Is that correct?`,
+    request_payment: `Please pay when ready for ${selectedMenu?.name || "your order"}${joinedCustomizations}. You can say "I paid" after that.`,
     end: `Great job ordering ${selectedMenu?.name || "your food"}! Here is your food. Enjoy your recess!`,
     suggest_usual: "Do you want your usual order?",
     recall_preference: "Do you want it the usual way?",
@@ -39,6 +42,7 @@ function buildFallbackResponse(action, selectedMenu, customizations, context) {
     hint: "You can say your order one item at a time.",
     repeat: "Sure, I can repeat that.",
     rephrase: "Let me say that in a simpler way.",
+    free_response: "Okay, tell me a bit more and I will help you with your order.",
     handle_silence: "That is okay. Take your time.",
     handle_unavailable: "Sorry, we do not have that item today.",
     handle_invalid: "Please choose something from the menu.",
@@ -210,6 +214,8 @@ async function processTurn({ sessionId, userInput = "", inputMode = "text", incl
     endSession({ sessionId, xpEarned: 120 });
   }
 
+  const updatedSession = loadSession(sessionId);
+
   return {
     sessionId,
     interactionId: assistantInteractionId,
@@ -217,6 +223,8 @@ async function processTurn({ sessionId, userInput = "", inputMode = "text", incl
     action: validated.action,
     message: validated.message,
     objectiveCompleted,
+    completedObjectiveCount: updatedSession.completedObjectiveCount || 0,
+    objectiveProgress: updatedSession.objectiveProgress || [],
     orderSummary: validated.orderSummary,
   };
 }
@@ -235,8 +243,20 @@ export async function startConversation({ scenarioId, childId }) {
       scenarioId: context.scenario.scenarioId,
       title: context.scenario.title,
       locationName: context.scenario.locationName,
+      avatarType: context.scenario.avatarType,
+      avatarLabel: context.scenario.avatarLabel,
+      avatarImageUrl: context.scenario.avatarImageUrl,
+      hintDelaySeconds: context.scenario.hintDelaySeconds,
       objective: context.scenario.objective,
+      objectives: context.scenario.objectives || [],
     },
+    completedObjectiveCount: 0,
+    objectiveProgress: (context.scenario.objectives || []).map((objective) => ({
+      objectiveId: objective.objectiveId,
+      description: objective.description,
+      position: objective.position,
+      isChecked: false,
+    })),
     messages: [
       {
         speaker: "assistant",

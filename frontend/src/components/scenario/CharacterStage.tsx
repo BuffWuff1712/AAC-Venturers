@@ -4,10 +4,11 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 
 interface CharacterStageProps {
-  characterImage: string;
+  characterImage?: string;
   characterName: string;
   speech?: string;
   isListening?: boolean;
+  isLoading?: boolean;
 }
 
 const CharacterStage: React.FC<CharacterStageProps> = ({
@@ -15,6 +16,7 @@ const CharacterStage: React.FC<CharacterStageProps> = ({
   characterName,
   speech,
   isListening = false,
+  isLoading = false,
 }) => {
   const [visible, setVisible] = useState(false);
 
@@ -36,15 +38,15 @@ const CharacterStage: React.FC<CharacterStageProps> = ({
           This creates a 'permanent' space for the recording bar below them
           so the mascot doesn't jump when the bar appears/disappears.
           LOL this lowkey doesnt work but i guess it does help a bit with the positioning */}
-      <div className="absolute bottom-[60px] left-1/2 -translate-x-1/2 flex flex-col items-center">
+      <div className="absolute bottom-[0px] left-1/2 -translate-x-1/2 flex flex-col items-center">
 
         {/* ── 1. SPEECH BUBBLE ─────────────── */}
         {speech && (
           <div
             className={`
               absolute bottom-[360px] z-30
-              max-w-xs w-max px-6 py-4
-              bg-white rounded-[24px] shadow-2xl border-4 border-caregiver-peach
+              max-w-lg min-w-[200px] w-max px-8 py-4
+              bg-white rounded-[32px] shadow-2xl border-4 border-caregiver-peach
               transition-all duration-300 transform
               ${visible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-90 translate-y-4"}
             `}
@@ -65,17 +67,23 @@ const CharacterStage: React.FC<CharacterStageProps> = ({
           className={`relative transition-all duration-500 drop-shadow-2xl right-[8%]`}
           style={{ width: 300, height: 300 }}
         >
-          <Image
-            src={characterImage}
-            alt={characterName}
-            fill
-            className="object-contain object-bottom"
-            priority
-          />
+          {isLoading || !characterImage ? (
+            <div className="flex h-full w-full items-center justify-center rounded-full border-8 border-white/80 bg-white/75 shadow-inner">
+              <div className="h-24 w-24 animate-spin rounded-full border-8 border-caregiver-peach border-t-transparent" />
+            </div>
+          ) : (
+            <Image
+              src={characterImage}
+              alt={characterName}
+              fill
+              className="object-contain object-bottom"
+              priority
+            />
+          )}
         </div>
 
         {/* ── 3. NAME LABEL ─────────────────────────────────────────────── */}
-        <div className="mt-4 rounded-full bg-caregiver-peach px-10 py-2 text-xl font-black text-text-brown shadow-lg border-2 border-white">
+        <div className="mt-4 rounded-full bg-caregiver-peach px-10 py-1 text-xl font-black text-text-brown shadow-lg border-2 border-white">
           {characterName}
         </div>
 

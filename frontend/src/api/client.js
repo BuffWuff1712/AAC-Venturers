@@ -46,21 +46,35 @@ export function clearAuthSession() {
 
 async function request(path, options = {}) {
   const token = getStoredToken();
+  const isFormData = options.body instanceof FormData;
+  const shouldStringifyBody =
+    !isFormData &&
+    options.body &&
+    typeof options.body !== "string" &&
+    !(options.body instanceof Blob);
+
   const headers = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers || {}),
   };
 
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
+    body: shouldStringifyBody ? JSON.stringify(options.body) : options.body,
     headers,
   });
 
   if (!response.ok) {
-    const payload = await response
-      .json()
-      .catch(() => ({ message: "Request failed" }));
+    const rawText = await response.text().catch(() => "");
+    let payload = { message: "Request failed" };
+
+    try {
+      payload = rawText ? JSON.parse(rawText) : payload;
+    } catch {
+      payload = { message: rawText || "Request failed" };
+    }
+
     throw new Error(payload.message || "Request failed");
   }
 
@@ -68,7 +82,8 @@ async function request(path, options = {}) {
     return null;
   }
 
-  return response.json();
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
 }
 
 export const api = {
@@ -78,39 +93,62 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+
   getCaregiverScenarios() {
     return request("/caregiver/scenarios");
   },
+
   getCaregiverScenario(scenarioId) {
     return request(`/caregiver/scenarios/${scenarioId}`);
   },
+
+  createCaregiverScenario(payload) {
+    return request("/caregiver/scenarios", {
+      method: "POST",
+      body: payload,
+    });
+  },
+
   updateCaregiverScenarioSettings(scenarioId, payload) {
     return request(`/caregiver/scenarios/${scenarioId}/settings`, {
       method: "PUT",
-      body: JSON.stringify(payload),
+      body: payload,
     });
   },
+
+  deleteCaregiverScenario(scenarioId) {
+    return request(`/caregiver/scenarios/${scenarioId}`, {
+      method: "DELETE",
+    });
+  },
+
   getCaregiverScenarioHistory(scenarioId) {
     return request(`/caregiver/scenarios/${scenarioId}/history`);
   },
+
   getCaregiverSessionAnalytics(sessionId) {
     return request(`/caregiver/sessions/${sessionId}/analytics`);
   },
+
   getCaregiverAnalytics() {
     return request("/caregiver/analytics");
   },
+
   getChildScenarios() {
     return request("/child/scenarios");
   },
+
   startChildSession(payload) {
     return request("/child/sessions", {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
+
   getChildSession(sessionId) {
     return request(`/child/sessions/${sessionId}`);
   },
+
   sendChildMessage(sessionId, payload) {
     return request(`/child/sessions/${sessionId}/respond`, {
       method: "POST",
@@ -118,7 +156,13 @@ export const api = {
     });
   },
 
-  // Backward-compatible aliases for existing imports/usages.
+  requestChildHint(sessionId) {
+    return request(`/child/sessions/${sessionId}/hint`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  },
+
   getScenarios() {
     return this.getCaregiverScenarios();
   },
@@ -127,6 +171,9 @@ export const api = {
   },
   updateScenario(scenarioId, payload) {
     return this.updateCaregiverScenarioSettings(scenarioId, payload);
+  },
+  deleteScenario(scenarioId) {
+    return this.deleteCaregiverScenario(scenarioId);
   },
   getAnalytics() {
     return this.getCaregiverAnalytics();
@@ -145,5 +192,8 @@ export const api = {
   },
   sendMessage(sessionId, payload) {
     return this.sendChildMessage(sessionId, payload);
+  },
+  requestHint(sessionId) {
+    return this.requestChildHint(sessionId);
   },
 };

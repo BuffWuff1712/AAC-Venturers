@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { db } from "../db/database.js";
 import {
+  buildDefaultScenarioSettings,
+  mergeScenarioSettings,
+} from "../data/scenarioDefaults.js";
+import {
   handleConversationTurn,
   startConversation,
 } from "../services/orchestration/conversationOrchestrator.js";
@@ -8,6 +12,7 @@ import {
   loadScenarioContext,
   loadSession,
 } from "../services/orchestration/contextBuilder.js";
+import { generateResponse } from "../services/orchestration/responseGenerator.js";
 
 export const childRoutes = Router();
 
@@ -26,6 +31,8 @@ function buildSessionState(session) {
     sessionId: session.sessionId,
     status: session.status,
     objectiveCompleted: Boolean(session.objective_completed),
+    completedObjectiveCount: session.completedObjectiveCount || 0,
+    objectiveProgress: session.objectiveProgress || [],
     selectedItem: session.selected_item,
     selectedCustomizations: session.selectedCustomizations || [],
     hintsUsed: session.hints_used || 0,
@@ -74,6 +81,13 @@ function buildFallbackHint(session, context) {
   };
 }
 
+function normalizeHintText(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
 // Lists the child-playable scenarios available in the prototype.
 childRoutes.get("/scenarios", (req, res) => {
   try {
@@ -88,12 +102,26 @@ childRoutes.get("/scenarios", (req, res) => {
       .all();
 
     res.json(
-      scenarios.map((scenario) => ({
-        scenarioId: scenario.scenario_id,
-        title: scenario.title,
-        locationName: scenario.location_name,
-        locationImage: scenario.location_image_url,
-      })),
+      scenarios.map((scenario) => {
+        const settings = mergeScenarioSettings(
+          {
+            scenario_id: scenario.scenario_id,
+            location_name: scenario.location_name,
+            location_image_url: scenario.location_image_url,
+          },
+          buildDefaultScenarioSettings({
+            scenarioId: scenario.scenario_id,
+            title: scenario.title,
+          }),
+        );
+
+        return {
+          scenarioId: scenario.scenario_id,
+          title: scenario.title,
+          locationName: settings.location_name,
+          locationImage: settings.location_image_url,
+        };
+      }),
     );
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch scenarios", error: error.message });
@@ -139,7 +167,12 @@ childRoutes.get("/sessions/:sessionId", (req, res, next) => {
         title: context.scenario.title,
         locationName: context.scenario.locationName,
         locationImageUrl: context.scenario.locationImageUrl,
+        avatarType: context.scenario.avatarType,
+        avatarLabel: context.scenario.avatarLabel,
+        avatarImageUrl: context.scenario.avatarImageUrl,
+        hintDelaySeconds: context.scenario.hintDelaySeconds,
         objective: context.scenario.objective,
+        objectives: context.scenario.objectives || [],
       },
       interactions: session.interactions || [],
       transcripts: (session.transcripts || []).map(mapTranscriptEntry),
@@ -164,20 +197,48 @@ childRoutes.post("/sessions/:sessionId/respond", async (req, res, next) => {
   }
 });
 
-// Returns caregiver-configured contingency guidance for a stuck moment, with a simple fallback.
-childRoutes.post("/sessions/:sessionId/hint", (req, res, next) => {
+// Returns a child-facing hint for a stuck moment, using scenario contingencies as internal guidance.
+childRoutes.post("/sessions/:sessionId/hint", async (req, res, next) => {
   try {
     const session = loadSession(req.params.sessionId);
     const context = loadScenarioContext(session.scenario_id);
     const configuredContingency = String(context.scenario.contingencies || "").trim();
+    const selectedMenu =
+      context.menu.find((item) => item.name === session.selected_item) || null;
 
-    const hintPayload = configuredContingency
-      ? {
-          action: "hint",
-          hint: configuredContingency,
-          source: "scenario_contingency",
-        }
-      : buildFallbackHint(session, context);
+    const generatedHint = await generateResponse({
+      context,
+      childMemory: null,
+      action: "hint",
+      userInput: "",
+      session,
+      selectedMenu,
+      customizations: session.selectedCustomizations || [],
+      interpretation: {
+        intent: "silence",
+        confidence: 1,
+      },
+    });
+
+    const fallbackHint = buildFallbackHint(session, context);
+    const generatedHintText = String(generatedHint?.message || "").trim();
+    const usesRawContingency =
+      normalizeHintText(generatedHintText) === normalizeHintText(configuredContingency);
+    const hintText =
+      generatedHintText && !usesRawContingency
+        ? generatedHintText
+        : fallbackHint.hint;
+    const hintPayload = {
+      action:
+        generatedHintText && !usesRawContingency
+          ? generatedHint?.action || fallbackHint.action
+          : fallbackHint.action,
+      hint: hintText,
+      source:
+        generatedHintText && !usesRawContingency
+          ? generatedHint?.source || "generated_hint"
+          : fallbackHint.source,
+    };
 
     res.json({
       sessionId: session.session_id,

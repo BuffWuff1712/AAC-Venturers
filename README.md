@@ -175,6 +175,7 @@ Frontend runs on `http://localhost:5173`.
 
 ## Demo credentials
 
+- Caregiver email: `teacher@example.com`
 - Caregiver password: `demo123`
 
 ## Notes

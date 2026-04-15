@@ -3,6 +3,10 @@ import Image from "next/image";
 import { useRouter } from "next/router";
 import { api, clearAuthSession } from "@/api/client";
 
+const BACKEND_BASE =
+  process.env.NEXT_PUBLIC_API_BASE?.replace(/\/api$/, "") ||
+  "http://localhost:4000";
+
 const fallbackScenarios = [
   {
     scenarioId: "scenario-001",
@@ -13,6 +17,40 @@ const fallbackScenarios = [
     description: "Practice ordering noodles and finding seats.",
   },
 ];
+
+const FALLBACK_LOCATION_IMAGE = "/images/canteen.jpg";
+
+function resolveScenarioImage(scenario) {
+  const rawImage =
+    scenario?.locationImageUrl ||
+    scenario?.imageUrl ||
+    scenario?.settings?.location_image_url ||
+    "";
+
+  if (!rawImage || typeof rawImage !== "string") {
+    return FALLBACK_LOCATION_IMAGE;
+  }
+
+  const normalizedImage = rawImage.trim();
+
+  if (!normalizedImage || normalizedImage === "/images/western-stall.jpg") {
+    return FALLBACK_LOCATION_IMAGE;
+  }
+
+  if (
+    normalizedImage.startsWith("http://") ||
+    normalizedImage.startsWith("https://") ||
+    normalizedImage.startsWith("blob:")
+  ) {
+    return normalizedImage;
+  }
+
+  if (normalizedImage.startsWith("/uploads/")) {
+    return `${BACKEND_BASE}${normalizedImage}`;
+  }
+
+  return normalizedImage;
+}
 
 const ManageScenario = () => {
   const router = useRouter();
@@ -27,7 +65,8 @@ const ManageScenario = () => {
         if (!isMounted) return;
 
         setApiScenarios(Array.isArray(data) ? data : []);
-      } catch {
+      } catch (error) {
+        console.error("Failed to load scenarios:", error);
         if (!isMounted) return;
         setApiScenarios([]);
       }
@@ -44,11 +83,14 @@ const ManageScenario = () => {
     if (apiScenarios.length > 0) {
       return apiScenarios.map((scenario) => ({
         scenarioId: scenario.scenarioId,
-        title: scenario.title || "Canteen",
-        locationName: scenario.locationName || scenario.title || "School Canteen",
-        isActive: scenario.isActive,
-        image: "/images/canteen.jpg",
-        description: "Practice ordering noodles and finding seats.",
+        title: scenario.title || "Untitled Scenario",
+        locationName:
+          scenario.locationName || scenario.title || "Unknown Location",
+        isActive: Boolean(scenario.isActive),
+        image: resolveScenarioImage(scenario),
+        description:
+          scenario.description ||
+          "Practice ordering noodles and finding seats.",
       }));
     }
 
@@ -76,6 +118,30 @@ const ManageScenario = () => {
         </p>
       </div>
 
+      {/* Action hub for scenario management plus the new achievements mockup flow. */}
+      <div className="mb-8 flex w-full max-w-6xl flex-wrap items-center justify-end gap-3">
+        <button
+          onClick={() => router.push("/achievements")}
+          className="flex items-center justify-center gap-2 rounded-2xl bg-caregiver-peach px-6 py-4 text-xl font-black text-text-brown shadow-[0_5px_0_#e6b181] transition-all hover:bg-[#ffc891] active:translate-y-[5px] active:shadow-none"
+        >
+          Top AAC-venturers <span className="text-2xl">🏆</span>
+        </button>
+
+        <button
+          onClick={() =>
+            router.push({
+              pathname: "/MainSettings",
+              query: {
+                mode: "add",
+              },
+            })
+          }
+          className="flex items-center justify-center gap-2 rounded-2xl bg-child-green px-6 py-4 text-xl font-black text-text-brown shadow-[0_5px_0_#92c45e] transition-all hover:bg-[#b9e67a] active:translate-y-[5px] active:shadow-none"
+        >
+          <span className="text-2xl">＋</span> Add Scenario
+        </button>
+      </div>
+
       <div className="grid w-full max-w-6xl grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
         {scenarios.map((scenario) => (
           <div
@@ -88,6 +154,7 @@ const ManageScenario = () => {
                 alt={scenario.title}
                 fill
                 className="object-cover"
+                unoptimized
               />
             </div>
 
@@ -102,6 +169,7 @@ const ManageScenario = () => {
                     router.push({
                       pathname: "/MainSettings",
                       query: {
+                        mode: "edit",
                         scenarioId: scenario.scenarioId,
                         scenarioTitle: scenario.title,
                       },

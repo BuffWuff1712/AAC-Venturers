@@ -23,7 +23,9 @@ function buildDeterministicResponse({
   const deterministicMessages = {
     list_menu: `We have ${context.menu.map((item) => item.name).join(", ")}. What would you like?`,
     confirm_order: `Okay! ${itemName || "Your order"}${customizationText}. Is that correct?`,
-    request_payment: `Please pay when ready for ${itemName || "your order"}. You can say "I paid" after that.`,
+    request_payment: interpretation?.asksPaymentOptions
+      ? `You can pay by cash or card for ${itemName || "your order"}${customizationText}.`
+      : `Please pay when ready for ${itemName || "your order"}${customizationText}. Cash or card is okay.`,
     end: `Great job ordering ${itemName || "your food"}! Here is your food. Enjoy your recess!`,
     ask_customization: interpretation?.asksCustomizationOptions
       ? `For ${itemName || "that"}, you can choose ${availableOptions || "no customisations"}.`

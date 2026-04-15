@@ -1,6 +1,12 @@
 import { db } from "../../db/database.js";
 import { childId as seededChildId } from "../../data/seedData.js";
 import { westernStallMenu } from "../../data/menuCatalog.js";
+import {
+  buildDefaultScenarioSettings,
+  buildObjectiveText,
+  mergeObjectives,
+  mergeScenarioSettings,
+} from "../../data/scenarioDefaults.js";
 
 function inferPersonality(aiPrompt = "") {
   const normalized = String(aiPrompt || "").toLowerCase();
@@ -70,15 +76,20 @@ export function loadScenarioContext(scenarioId) {
     throw new Error("Scenario not found");
   }
 
-  const settings = db
+  const storedSettings = db
     .prepare("SELECT * FROM scenario_settings WHERE scenario_id = ?")
     .get(scenarioId) || {};
 
-  const objectives = db
+  const storedObjectives = db
     .prepare("SELECT * FROM objectives WHERE scenario_id = ? ORDER BY position")
     .all(scenarioId);
 
-  const objectiveText = objectives.map((objective) => objective.description).join(" Then ");
+  const settings = mergeScenarioSettings(
+    storedSettings,
+    buildDefaultScenarioSettings({ scenarioId, title: scenario.title }),
+  );
+  const objectives = mergeObjectives(storedObjectives, scenarioId);
+  const objectiveText = buildObjectiveText(objectives);
 
   return {
     scenario: {
@@ -89,17 +100,22 @@ export function loadScenarioContext(scenarioId) {
       title: scenario.title,
       description:
         settings.location_name || "Child practises ordering from a western food stall during recess.",
-      objective: objectiveText || "Order food and complete the purchase interaction.",
+      objective: objectiveText,
       personality: inferPersonality(settings.ai_personality_prompt),
       memoryEnabled: inferMemoryEnabled(settings.ai_personality_prompt, settings.contingencies),
       locationName: settings.location_name || scenario.title,
       locationImageUrl: settings.location_image_url || "",
+      avatarType: settings.avatar_type || "store_owner",
+      avatarLabel: settings.avatar_label || "Store Owner",
+      avatarImageUrl: settings.avatar_image_url || "",
       backgroundNoise: settings.background_noise ?? 20,
+      hintDelaySeconds: settings.hint_delay_seconds ?? 5,
       aiPersonalityPrompt: settings.ai_personality_prompt || "",
       contingencies: settings.contingencies || "",
       objectives: objectives.map((objective) => ({
         objectiveId: objective.objective_id,
         description: objective.description,
+        objectiveRule: objective.objective_rule,
         position: objective.position,
         isRequired: Boolean(objective.is_required),
       })),
@@ -217,6 +233,22 @@ export function loadSession(sessionId) {
       };
     });
 
+  const objectiveProgress = db
+    .prepare(`
+      SELECT oc.objective_id, oc.is_checked, o.description, o.position
+      FROM objective_completion oc
+      INNER JOIN objectives o ON o.objective_id = oc.objective_id
+      WHERE oc.session_id = ?
+      ORDER BY o.position, o.objective_id
+    `)
+    .all(sessionId)
+    .map((row) => ({
+      objectiveId: row.objective_id,
+      description: row.description,
+      position: row.position,
+      isChecked: Boolean(row.is_checked),
+    }));
+
   const transcripts = buildTranscripts(interactions);
   const lastAssistantInteraction = [...interactions].reverse().find((interaction) => interaction.questionText);
 
@@ -255,6 +287,14 @@ export function loadSession(sessionId) {
     averageResponseTimeMs: Math.round((storedState.averageResponseTimeSeconds || 0) * 1000),
     hints_used: storedState.hintsUsed || 0,
     clarification_count: storedState.clarificationCount || 0,
+    objective_progress: objectiveProgress,
+    objectiveProgress,
+    completed_objective_count:
+      storedState.completedObjectiveCount ||
+      objectiveProgress.filter((objective) => objective.isChecked).length,
+    completedObjectiveCount:
+      storedState.completedObjectiveCount ||
+      objectiveProgress.filter((objective) => objective.isChecked).length,
     sessionState: storedState,
     interactions,
     transcripts,

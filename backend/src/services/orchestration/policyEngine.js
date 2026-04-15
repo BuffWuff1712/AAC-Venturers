@@ -82,6 +82,14 @@ export function decidePolicy({ context, session, interpretation, state, childMem
     };
   }
 
+  if (interpretation.asksPaymentOptions && state.selectedItem) {
+    return {
+      action: "request_payment",
+      selectedMenu,
+      signals: { needsClarification: false, objectiveCompleted: false },
+    };
+  }
+
   if (interpretation.changeOrderRequested) {
     if (interpretation.item) {
       const changedMenu = context.menu.find((item) => item.name === interpretation.item);
@@ -99,6 +107,22 @@ export function decidePolicy({ context, session, interpretation, state, childMem
     };
   }
 
+  if ((interpretation.addOnRequested || state.addOnRequested) && selectedMenu) {
+    return {
+      action: "confirm_order",
+      selectedMenu,
+      signals: { needsClarification: false, objectiveCompleted: false },
+    };
+  }
+
+  if ((interpretation.removedAddOnItem || (interpretation.removedPreferences || []).length) && selectedMenu) {
+    return {
+      action: "confirm_order",
+      selectedMenu,
+      signals: { needsClarification: false, objectiveCompleted: false },
+    };
+  }
+
   if (!state.selectedItem && interpretation.unavailableRequest) {
     return { action: "handle_unavailable", selectedMenu, signals: { needsClarification: true, objectiveCompleted: false } };
   }
@@ -109,6 +133,10 @@ export function decidePolicy({ context, session, interpretation, state, childMem
 
   if (!state.selectedItem && interpretation.confused) {
     return { action: "prompt_choice", selectedMenu, signals: { needsClarification: true, objectiveCompleted: false } };
+  }
+
+  if (interpretation.intent === "unknown") {
+    return { action: "free_response", selectedMenu, signals: { needsClarification: false, objectiveCompleted: false } };
   }
 
   if (!state.selectedItem) {
