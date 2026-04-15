@@ -54,6 +54,7 @@ function resolveAvatarImage(avatarImageUrl?: string, avatarType?: string) {
 
 const CanteenScenario: React.FC = () => {
   const router = useRouter();
+  const bgAudioRef = useRef<HTMLAudioElement | null>(null);
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [analytics, setAnalytics] = useState<PromptAnalytic[]>([]);
   const [isRecording, setIsRecording] = useState(false);
@@ -148,6 +149,20 @@ const CanteenScenario: React.FC = () => {
           childId: childUser.childId,
         });
 
+        // ─── LINKING THE VOLUME HERE ───
+        if (bgAudioRef.current && response.scenario?.settings) {
+          // Get the noise level from the API response (e.g., 20)
+          const noiseLevel = Number(response.scenario.settings.backgroundNoise || 0);
+
+          // Convert to a 0.0 - 1.0 scale
+          bgAudioRef.current.volume = noiseLevel / 100;
+
+          // If noise is set to 0, we can just mute it
+          bgAudioRef.current.muted = noiseLevel === 0;
+        }
+        // ───────────────────────────────
+
+
         if (!isMounted) return;
 
         const openingMessage = Array.isArray(response.messages)
@@ -202,6 +217,29 @@ const CanteenScenario: React.FC = () => {
       stopCountdown();
     };
   }, [addEntry, prepareChildUser, router.isReady, router.query.scenarioId, startCountdown, stopCountdown]);
+
+  useEffect(() => {
+    // 1. Initialize the audio
+    bgAudioRef.current = new Audio("/audio/canteen_bg.mp3");
+    bgAudioRef.current.loop = true;
+    bgAudioRef.current.volume = 0.15; // Keep it low (15%) so it's not overwhelming
+
+    // 2. Start playing when the session starts
+    // Note: Most browsers require a user interaction (like the "Let's Go" button) 
+    // to allow audio to play.
+    const playAudio = () => {
+      bgAudioRef.current?.play().catch(err => console.log("Audio play blocked", err));
+    };
+
+    playAudio();
+
+    // 3. Cleanup: Stop the noise when leaving the page or finishing
+    return () => {
+      bgAudioRef.current?.pause();
+      bgAudioRef.current = null;
+    };
+  }, []);
+
 
   const handleTranscript = useCallback(
     async (text: string) => {
@@ -379,8 +417,10 @@ const CanteenScenario: React.FC = () => {
     setIsPaused(false);
     setIsRecording(true);
     startCountdown();
+    bgAudioRef.current?.play(); // Resume noise
     promptStartRef.current = Date.now(); // Reset timer so child isn't penalized for the pause
   }, [startCountdown]);
+
 
 
   return (
@@ -431,6 +471,7 @@ const CanteenScenario: React.FC = () => {
                 setIsRecording(false);
                 stopCountdown();
                 setIsPaused(true); // Open the modal
+                bgAudioRef.current?.pause();
               }}
             />
           </div>
