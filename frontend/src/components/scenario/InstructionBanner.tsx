@@ -20,7 +20,7 @@ const InstructionBanner: React.FC<InstructionBannerProps> = ({
 
   return (
     // Changed background to bg-caregiver-peach, updated z-index to stay on top
-    <div className="relative w-full overflow-hidden rounded-2xl bg-caregiver-peach px-6 py-4 shadow-lg z-20">
+    <div className="relative z-20 w-full shrink-0 overflow-hidden rounded-2xl bg-caregiver-peach px-6 py-4 shadow-lg min-h-[76px] md:min-h-[84px]">
 
       {/* ── Thin progress bar along the bottom of the banner ──
           Updated color to child-green for better visibility against peach */}
@@ -31,15 +31,15 @@ const InstructionBanner: React.FC<InstructionBannerProps> = ({
         />
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         {/* Left: step info + instruction */}
-        <div>
+        <div className="min-w-0 flex-1 pb-0.5">
           {/* Color changed to text-text-brown with opacity */}
           <p className="text-xs font-bold uppercase tracking-widest text-text-brown opacity-60">
             Step {currentStep} of {totalSteps}
           </p>
           {/* Color changed to text-text-brown, font weight increased to font-black */}
-          <p className="mt-0.5 text-2xl font-black text-text-brown drop-shadow-sm">
+          <p className="mt-0.5 text-2xl font-black leading-tight text-text-brown drop-shadow-sm">
             {instruction}
           </p>
         </div>
@@ -51,7 +51,7 @@ const InstructionBanner: React.FC<InstructionBannerProps> = ({
             className={`flex items-center gap-2 rounded-full border-2 px-4 py-2 text-lg font-black backdrop-blur-sm ${timeRemaining <= 10
                 ? "animate-pulse border-red-500 bg-red-50 text-red-600"
                 : "border-white/50 bg-white/20 text-text-brown"
-              }`}
+              } shrink-0`}
           >
             {/* Clock icon, color set by parent text color */}
             <svg
