@@ -86,7 +86,7 @@ const CanteenScenario: React.FC = () => {
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [analytics, setAnalytics] = useState<PromptAnalytic[]>([]);
   const [isRecording, setIsRecording] = useState(false);
-  const [countdown, setCountdown] = useState(30);
+  const [countdown, setCountdown] = useState(20);
   const [showAchievement, setShowAchievement] = useState(false);
   const [scenarioDone, setScenarioDone] = useState(false);
   const [sessionId, setSessionId] = useState("");
@@ -211,7 +211,7 @@ const CanteenScenario: React.FC = () => {
           getAvatarLabel(response.scenario?.avatarType, response.scenario?.avatarLabel)
         );
         setHintDelayMs(
-          Math.max(1, Number(response.scenario?.hintDelaySeconds) || 5) * 1000
+          Math.max(1, Number(response.scenario?.hintDelaySeconds) || 20) * 1000
         );
         setScenarioObjectives(
           Array.isArray(response.scenario?.objectives) && response.scenario.objectives.length
@@ -232,9 +232,9 @@ const CanteenScenario: React.FC = () => {
         }
 
         promptStartRef.current = Date.now();
-        setCountdown(30);
+        setCountdown(20);
         setIsRecording(true);
-        setCountdown(30);
+        setCountdown(20);
         startCountdown();
       } catch (err) {
         if (!isMounted) return;
@@ -375,7 +375,7 @@ const CanteenScenario: React.FC = () => {
         }
 
         promptStartRef.current = Date.now();
-        setCountdown(30);
+        setCountdown(20);
         setIsRecording(true);
         startCountdown();
       } catch (err) {

@@ -30,7 +30,7 @@ function buildDeterministicResponse({
     end: `${characterVoice.endLead} ordering ${itemName || "your food"}! Here it is. Enjoy!`,
     ask_customization: interpretation?.asksCustomizationOptions
       ? `For ${itemName || "that"}, you can choose ${availableOptions || "no customisations"}.`
-      : `Any changes for ${itemName || "that"}? You can also say no customisations.`,
+      : `Anything else for ${itemName || "that"}?`,
     suggest_usual: `Welcome back! Do you want your usual ${childMemory?.favouriteOrder || itemName || "order"}?`,
     follow_up: `${characterVoice.followUpLead}. What would you like to change?`,
   };

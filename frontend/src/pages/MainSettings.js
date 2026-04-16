@@ -76,7 +76,7 @@ const fallbackScenario = {
     avatarLabel: "Student",
     avatarImageUrl: "/images/student.png",
     backgroundNoise: 20,
-    hintDelaySeconds: 5,
+    hintDelaySeconds: 20,
     aiPersonalityPrompt:
       "You are a friendly student also queuing in the same line. Encourage the child gently and wait for their response.",
     contingencies:
@@ -112,7 +112,7 @@ const emptyScenario = {
     avatarLabel: "Store Owner",
     avatarImageUrl: "/images/cook.png",
     backgroundNoise: 20,
-    hintDelaySeconds: 5,
+    hintDelaySeconds: 20,
     aiPersonalityPrompt: "",
     contingencies: "",
   },
@@ -455,7 +455,7 @@ const MainSettings = () => {
           ),
           objectives: mapObjectivesForForm(nextScenario.objectives),
           backgroundNoise: Number(nextScenario.settings?.backgroundNoise ?? 20),
-          hintDelaySeconds: Number(nextScenario.settings?.hintDelaySeconds ?? 5),
+          hintDelaySeconds: Number(nextScenario.settings?.hintDelaySeconds ?? 20),
           aiPersonality: nextScenario.settings?.aiPersonalityPrompt || "",
           contingencies: nextScenario.settings?.contingencies || "",
         });
@@ -743,7 +743,7 @@ const MainSettings = () => {
       payload.append("backgroundNoise", String(Number(formData.backgroundNoise) || 0));
       payload.append(
         "hintDelaySeconds",
-        String(Math.max(1, Number(formData.hintDelaySeconds) || 5))
+        String(Math.max(1, Number(formData.hintDelaySeconds) || 20))
       );
       payload.append("aiPersonalityPrompt", formData.aiPersonality || "");
       payload.append("contingencies", formData.contingencies || "");

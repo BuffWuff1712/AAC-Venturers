@@ -264,7 +264,7 @@ caregiverRoutes.post(
         avatarSelection.normalizedAvatarLabel,
         avatarImageUrl,
         Number(backgroundNoise ?? 20),
-        Number(hintDelaySeconds ?? 5),
+        Number(hintDelaySeconds ?? 20),
         aiPersonalityPrompt || avatarSelection.aiPersonalityPrompt || "",
         contingencies || ""
       );
@@ -503,7 +503,7 @@ caregiverRoutes.put(
           avatarSelection.normalizedAvatarLabel,
           avatarImageUrl,
           Number(backgroundNoise ?? 20),
-          Number(hintDelaySeconds ?? 5),
+          Number(hintDelaySeconds ?? 20),
           aiPersonalityPrompt || avatarSelection.aiPersonalityPrompt || "",
           contingencies || "",
           scenarioId
@@ -526,7 +526,7 @@ caregiverRoutes.put(
           avatarSelection.normalizedAvatarLabel,
           avatarImageUrl,
           Number(backgroundNoise ?? 20),
-          Number(hintDelaySeconds ?? 5),
+          Number(hintDelaySeconds ?? 20),
           aiPersonalityPrompt || avatarSelection.aiPersonalityPrompt || "",
           contingencies || ""
         );

@@ -28,7 +28,7 @@ function buildFallbackResponse(action, selectedMenu, customizations, context) {
     greet: "Hi there! What would you like from the western stall today?",
     list_menu: `We have ${fullMenuList}. What would you like?`,
     clarify: "Please tell me which food item you want.",
-    ask_customization: "Any changes for that item? You can also say no customisations.",
+    ask_customization: "Anything else for that item?",
     offer_add_on: "Would you like a drink or fries with that?",
     confirm_order: `Okay! ${selectedMenu?.name || "Your order"}${joinedCustomizations}. Is that correct?`,
     request_payment: `Please pay when ready for ${selectedMenu?.name || "your order"}${joinedCustomizations}. You can say "I paid" after that.`,

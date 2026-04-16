@@ -1,5 +1,5 @@
 export const DEFAULT_BACKGROUND_NOISE = 20;
-export const DEFAULT_HINT_DELAY_SECONDS = 5;
+export const DEFAULT_HINT_DELAY_SECONDS = 20;
 export const DEFAULT_LOCATION_IMAGE_URL = "/images/western-stall.jpg";
 export const DEFAULT_AVATAR_TYPE = "store_owner";
 export const DEFAULT_AVATAR_IMAGE_URL = "/images/cook.png";

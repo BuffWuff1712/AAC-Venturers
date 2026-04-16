@@ -61,7 +61,7 @@ function buildFallbackHint(session, context) {
   if (!session.pending_payment && !(session.selectedCustomizations || []).length) {
     return {
       action: "hint",
-      hint: `You can add changes for ${session.selected_item} or say "no customisations".`,
+      hint: "You can also say no customisations.",
       source: "fallback",
     };
   }
@@ -212,6 +212,10 @@ childRoutes.post("/sessions/:sessionId/hint", async (req, res, next) => {
     const configuredContingency = String(context.scenario.contingencies || "").trim();
     const selectedMenu =
       context.menu.find((item) => item.name === session.selected_item) || null;
+    const awaitingCustomization =
+      Boolean(session.selected_item) &&
+      !session.pending_payment &&
+      !(session.selectedCustomizations || []).length;
 
     const generatedHint = await generateResponse({
       context,
@@ -231,18 +235,21 @@ childRoutes.post("/sessions/:sessionId/hint", async (req, res, next) => {
     const generatedHintText = String(generatedHint?.message || "").trim();
     const usesRawContingency =
       normalizeHintText(generatedHintText) === normalizeHintText(configuredContingency);
-    const hintText =
-      generatedHintText && !usesRawContingency
+    const hintText = awaitingCustomization
+      ? fallbackHint.hint
+      : generatedHintText && !usesRawContingency
         ? generatedHintText
         : fallbackHint.hint;
     const hintPayload = {
-      action:
-        generatedHintText && !usesRawContingency
+      action: awaitingCustomization
+        ? fallbackHint.action
+        : generatedHintText && !usesRawContingency
           ? generatedHint?.action || fallbackHint.action
           : fallbackHint.action,
       hint: hintText,
-      source:
-        generatedHintText && !usesRawContingency
+      source: awaitingCustomization
+        ? fallbackHint.source
+        : generatedHintText && !usesRawContingency
           ? generatedHint?.source || "generated_hint"
           : fallbackHint.source,
     };

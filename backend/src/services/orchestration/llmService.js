@@ -360,7 +360,7 @@ function fallbackMessage(context, action, selectedMenu, customizations = [], chi
     ask_quantity:
       `How many would you like for ${itemName || "that item"}?`,
     ask_customization:
-      `Any changes for ${itemName || "that"}? You can say no coleslaw, chilli on the side, or extra fries.`,
+      `Anything else for ${itemName || "that"}?`,
     offer_add_on:
       `Would you like a drink or fries with your ${itemName || "order"}?`,
     handle_unavailable:

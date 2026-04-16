@@ -110,7 +110,7 @@ export function loadScenarioContext(scenarioId) {
       avatarLabel: settings.avatar_label || "Store Owner",
       avatarImageUrl: settings.avatar_image_url || "",
       backgroundNoise: settings.background_noise ?? 20,
-      hintDelaySeconds: settings.hint_delay_seconds ?? 5,
+      hintDelaySeconds: settings.hint_delay_seconds ?? 20,
       aiPersonalityPrompt: settings.ai_personality_prompt || "",
       contingencies: settings.contingencies || "",
       objectives: objectives.map((objective) => ({
