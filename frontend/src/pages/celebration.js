@@ -5,18 +5,27 @@ import confetti from "canvas-confetti"; // Import the confetti library
 const CelebrationPage = () => {
     const router = useRouter();
     const [showContent, setShowContent] = useState(false);
+    const [showAchievement, setShowAchievement] = useState(true);
 
     // Get the previous scenario from the URL query
     const { from, result } = router.query;
 
     useEffect(() => {
+        // Hide achievement banner after 10 seconds
+        const achievementTimer = setTimeout(() => {
+            setShowAchievement(false);
+        }, 10000);
+
         const timer = setTimeout(() => {
             setShowContent(true);
 
             // 🎉 Trigger the confetti burst!
             fireCelebrationConfetti();
         }, 300);
-        return () => clearTimeout(timer);
+        return () => {
+            clearTimeout(timer);
+            clearTimeout(achievementTimer);
+        };
     }, []);
 
     const fireCelebrationConfetti = () => {
@@ -52,11 +61,22 @@ const CelebrationPage = () => {
     return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-page-peach p-6 font-fredoka overflow-hidden relative">
 
+            {/* Achievement Banner */}
+            <div className={`fixed top-0 left-0 right-0 z-[200] transition-all duration-500 transform ${
+                showAchievement ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
+            }`}>
+                <div className="bg-gradient-to-r from-child-green to-[#a8d970] shadow-lg px-8 py-8 text-center">
+                    <p className="text-white font-black text-2xl drop-shadow-md">
+                        🏆 Achievement Earned: Canteen AACventurer
+                    </p>
+                </div>
+            </div>
+
             <div className={`transition-all duration-700 transform ${showContent ? 'scale-100 opacity-100' : 'scale-50 opacity-0'} 
                 bg-white rounded-[60px] p-12 shadow-2xl border-8 border-child-green text-center max-w-lg w-full relative z-50`}>
 
-                <div className="relative mb-6">
-                    <span className="text-9xl block animate-bounce">⭐</span>
+                <div className="relative mb-1">
+                    <img src="/images/thumbs_up.png" alt="Success" className="w-50 h-50 mx-auto animate-bounce" />
                     <div className="absolute -top-4 -right-2 bg-yellow-400 text-text-brown font-black px-6 py-2 rounded-full text-3xl shadow-lg border-4 border-white">
                         +50 XP
                     </div>
