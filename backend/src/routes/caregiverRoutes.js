@@ -90,6 +90,7 @@ function mapScenarioSettings(settings) {
     settingsId: settings.settings_id,
     scenarioId: settings.scenario_id,
     locationName: settings.location_name,
+    scenarioDescription: settings.scenario_description,
     locationImageUrl: settings.location_image_url,
     avatarType: settings.avatar_type,
     avatarLabel: settings.avatar_label,
@@ -205,6 +206,7 @@ caregiverRoutes.post(
       const {
         title,
         locationName,
+        scenarioDescription,
         locationImageUrl: rawLocationImageUrl,
         avatarType,
         avatarLabel,
@@ -248,14 +250,15 @@ caregiverRoutes.post(
 
       db.prepare(`
         INSERT INTO scenario_settings (
-          settings_id, scenario_id, location_name, location_image_url,
+          settings_id, scenario_id, location_name, scenario_description, location_image_url,
           avatar_type, avatar_label, avatar_image_url, background_noise, hint_delay_seconds, ai_personality_prompt, contingencies
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         settingsId,
         scenarioId,
         finalLocationName,
+        String(scenarioDescription || "").trim(),
         imageUrl,
         avatarSelection.normalizedAvatarType,
         avatarSelection.normalizedAvatarLabel,
@@ -429,6 +432,7 @@ caregiverRoutes.put(
       const {
         title,
         locationName,
+        scenarioDescription,
         locationImageUrl: rawLocationImageUrl,
         avatarType,
         avatarLabel,
@@ -488,11 +492,12 @@ caregiverRoutes.put(
       if (existingSettings) {
         db.prepare(`
           UPDATE scenario_settings
-          SET location_name = ?, location_image_url = ?, avatar_type = ?, avatar_label = ?, avatar_image_url = ?, background_noise = ?,
+          SET location_name = ?, scenario_description = ?, location_image_url = ?, avatar_type = ?, avatar_label = ?, avatar_image_url = ?, background_noise = ?,
               hint_delay_seconds = ?, ai_personality_prompt = ?, contingencies = ?, updated_at = CURRENT_TIMESTAMP
           WHERE scenario_id = ?
         `).run(
           locationName,
+          String(scenarioDescription || "").trim(),
           imageUrl,
           avatarSelection.normalizedAvatarType,
           avatarSelection.normalizedAvatarLabel,
@@ -507,14 +512,15 @@ caregiverRoutes.put(
         const settingsId = `settings-${scenarioId}`;
         db.prepare(`
           INSERT INTO scenario_settings (
-            settings_id, scenario_id, location_name, location_image_url,
+            settings_id, scenario_id, location_name, scenario_description, location_image_url,
             avatar_type, avatar_label, avatar_image_url, background_noise, hint_delay_seconds, ai_personality_prompt, contingencies
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           settingsId,
           scenarioId,
           locationName,
+          String(scenarioDescription || "").trim(),
           imageUrl,
           avatarSelection.normalizedAvatarType,
           avatarSelection.normalizedAvatarLabel,

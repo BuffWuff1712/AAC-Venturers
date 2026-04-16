@@ -156,6 +156,7 @@ export function buildDefaultScenarioSettings({ scenarioId, title } = {}) {
     settings_id: `settings-${scenarioId || "default"}`,
     scenario_id: scenarioId || "",
     location_name: title || DEFAULT_LOCATION_NAME,
+    scenario_description: DEFAULT_SCENARIO_DESCRIPTION,
     location_image_url: DEFAULT_LOCATION_IMAGE_URL,
     avatar_type: avatarDefaults.avatarType,
     avatar_label: avatarDefaults.avatarLabel,
@@ -193,6 +194,10 @@ export function mergeScenarioSettings(settings = {}, fallbackSettings = {}) {
     ...settings,
     location_name:
       settings.location_name?.trim() || fallbackSettings.location_name || DEFAULT_LOCATION_NAME,
+    scenario_description:
+      settings.scenario_description?.trim() ||
+      fallbackSettings.scenario_description ||
+      DEFAULT_SCENARIO_DESCRIPTION,
     location_image_url:
       settings.location_image_url?.trim() ||
       fallbackSettings.location_image_url ||

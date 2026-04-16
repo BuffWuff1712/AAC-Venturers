@@ -2,6 +2,7 @@ import { db } from "../../db/database.js";
 import { childId as seededChildId } from "../../data/seedData.js";
 import { westernStallMenu } from "../../data/menuCatalog.js";
 import {
+  DEFAULT_SCENARIO_DESCRIPTION,
   buildDefaultScenarioSettings,
   buildObjectiveText,
   mergeObjectives,
@@ -99,7 +100,7 @@ export function loadScenarioContext(scenarioId) {
       name: scenario.title,
       title: scenario.title,
       description:
-        settings.location_name || "Child practises ordering from a western food stall during recess.",
+        settings.scenario_description || DEFAULT_SCENARIO_DESCRIPTION,
       objective: objectiveText,
       personality: inferPersonality(settings.ai_personality_prompt),
       memoryEnabled: inferMemoryEnabled(settings.ai_personality_prompt, settings.contingencies),

@@ -93,7 +93,7 @@ childRoutes.get("/scenarios", (req, res) => {
   try {
     const scenarios = db
       .prepare(`
-        SELECT s.scenario_id, s.title, s.is_active, ss.location_name, ss.location_image_url
+        SELECT s.scenario_id, s.title, s.is_active, ss.location_name, ss.scenario_description, ss.location_image_url
         FROM scenarios s
         LEFT JOIN scenario_settings ss ON s.scenario_id = ss.scenario_id
         WHERE s.is_active = 1
@@ -107,6 +107,7 @@ childRoutes.get("/scenarios", (req, res) => {
           {
             scenario_id: scenario.scenario_id,
             location_name: scenario.location_name,
+            scenario_description: scenario.scenario_description,
             location_image_url: scenario.location_image_url,
           },
           buildDefaultScenarioSettings({
@@ -119,6 +120,7 @@ childRoutes.get("/scenarios", (req, res) => {
           scenarioId: scenario.scenario_id,
           title: scenario.title,
           locationName: settings.location_name,
+          description: settings.scenario_description,
           locationImage: settings.location_image_url,
         };
       }),

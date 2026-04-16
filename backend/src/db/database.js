@@ -8,6 +8,7 @@ import {
   buildCustomAvatarPrompt,
   DEFAULT_AI_PERSONALITY_PROMPT,
   DEFAULT_HINT_DELAY_SECONDS,
+  DEFAULT_SCENARIO_DESCRIPTION,
   getAvatarDefaults,
   inferObjectiveRule,
 } from "../data/scenarioDefaults.js";
@@ -44,6 +45,7 @@ function runMigrations(database) {
   ensureColumn(database, "scenario_settings", "avatar_type", "TEXT DEFAULT 'store_owner'");
   ensureColumn(database, "scenario_settings", "avatar_label", "TEXT DEFAULT 'Store Owner'");
   ensureColumn(database, "scenario_settings", "avatar_image_url", "TEXT");
+  ensureColumn(database, "scenario_settings", "scenario_description", "TEXT");
   ensureColumn(
     database,
     "scenario_settings",
@@ -71,14 +73,14 @@ function runMigrations(database) {
 
   const settingsRows = database
     .prepare(`
-      SELECT settings_id, avatar_type, avatar_label, avatar_image_url, hint_delay_seconds, ai_personality_prompt
+      SELECT settings_id, avatar_type, avatar_label, avatar_image_url, hint_delay_seconds, ai_personality_prompt, scenario_description
       FROM scenario_settings
     `)
     .all();
 
   const updateSettings = database.prepare(`
     UPDATE scenario_settings
-    SET avatar_type = ?, avatar_label = ?, avatar_image_url = ?, hint_delay_seconds = ?, ai_personality_prompt = ?
+    SET avatar_type = ?, avatar_label = ?, avatar_image_url = ?, hint_delay_seconds = ?, ai_personality_prompt = ?, scenario_description = ?
     WHERE settings_id = ?
   `);
 
@@ -95,6 +97,8 @@ function runMigrations(database) {
     const normalizedHintDelaySeconds = Number.isFinite(Number(settings.hint_delay_seconds))
       ? Number(settings.hint_delay_seconds)
       : DEFAULT_HINT_DELAY_SECONDS;
+    const normalizedScenarioDescription =
+      String(settings.scenario_description || "").trim() || DEFAULT_SCENARIO_DESCRIPTION;
 
     updateSettings.run(
       normalizedAvatarType,
@@ -102,6 +106,7 @@ function runMigrations(database) {
       normalizedAvatarImageUrl,
       normalizedHintDelaySeconds,
       normalizedPrompt,
+      normalizedScenarioDescription,
       settings.settings_id,
     );
   });

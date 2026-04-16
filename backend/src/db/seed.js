@@ -59,10 +59,10 @@ export function seedDatabase(db) {
   // Insert scenario settings
   const insertSettings = db.prepare(`
     INSERT OR IGNORE INTO scenario_settings (
-      settings_id, scenario_id, location_name, location_image_url,
+      settings_id, scenario_id, location_name, scenario_description, location_image_url,
       avatar_type, avatar_label, avatar_image_url, background_noise, hint_delay_seconds, ai_personality_prompt, contingencies
     )
-    VALUES (@settings_id, @scenario_id, @location_name, @location_image_url,
+    VALUES (@settings_id, @scenario_id, @location_name, @scenario_description, @location_image_url,
             @avatar_type, @avatar_label, @avatar_image_url, @background_noise, @hint_delay_seconds, @ai_personality_prompt, @contingencies)
   `);
 

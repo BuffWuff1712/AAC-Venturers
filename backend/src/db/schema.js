@@ -40,6 +40,7 @@ export function createSchema(db) {
       settings_id TEXT PRIMARY KEY,
       scenario_id TEXT UNIQUE,
       location_name TEXT,
+      scenario_description TEXT,
       location_image_url TEXT,
       avatar_type TEXT DEFAULT 'store_owner',
       avatar_label TEXT DEFAULT 'Store Owner',

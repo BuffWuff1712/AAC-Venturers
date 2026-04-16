@@ -69,6 +69,8 @@ const fallbackScenario = {
   },
   settings: {
     locationName: "Canteen",
+    scenarioDescription:
+      "Child practises ordering food in a busy canteen and building confidence in real-world conversations.",
     locationImageUrl: "/images/canteen.jpg",
     avatarType: "student",
     avatarLabel: "Student",
@@ -104,6 +106,7 @@ const emptyScenario = {
   },
   settings: {
     locationName: "",
+    scenarioDescription: "",
     locationImageUrl: "",
     avatarType: "store_owner",
     avatarLabel: "Store Owner",
@@ -261,6 +264,7 @@ const MainSettings = () => {
 
   const [settings, setSettings] = useState({
     locationNameEnabled: true,
+    scenarioDescriptionEnabled: true,
     locationImageEnabled: true,
     avatarEnabled: true,
     objectivesEnabled: true,
@@ -271,6 +275,7 @@ const MainSettings = () => {
 
   const [formData, setFormData] = useState({
     locationName: "",
+    scenarioDescription: "",
     locationImage: FALLBACK_LOCATION_IMAGE,
     avatarType: "store_owner",
     avatarLabel: "Store Owner",
@@ -402,6 +407,7 @@ const MainSettings = () => {
         setAvatarImageFile(null);
         setFormData({
           locationName: fallbackScenario.settings.locationName,
+          scenarioDescription: fallbackScenario.settings.scenarioDescription,
           locationImage: resolveScenarioImage(fallbackScenario.settings.locationImageUrl),
           avatarType: fallbackScenario.settings.avatarType,
           avatarLabel: fallbackScenario.settings.avatarLabel || getAvatarOption(fallbackScenario.settings.avatarType).label,
@@ -433,6 +439,7 @@ const MainSettings = () => {
         setAvatarImageFile(null);
         setFormData({
           locationName: nextScenario.settings?.locationName || "Canteen",
+          scenarioDescription: nextScenario.settings?.scenarioDescription || "",
           locationImage: resolveScenarioImage(nextScenario.settings?.locationImageUrl),
           avatarType: nextScenario.settings?.avatarType || "store_owner",
           avatarLabel:
@@ -468,6 +475,7 @@ const MainSettings = () => {
         setAvatarImageFile(null);
         setFormData({
           locationName: fallbackScenario.settings.locationName,
+          scenarioDescription: fallbackScenario.settings.scenarioDescription,
           locationImage: resolveScenarioImage(
             fallbackScenario.settings.locationImageUrl
           ),
@@ -715,6 +723,10 @@ const MainSettings = () => {
         normalizedLocationName || loadedScenario.scenario?.title || "New Scenario"
       );
       payload.append("locationName", normalizedLocationName);
+      payload.append(
+        "scenarioDescription",
+        String(formData.scenarioDescription || "").trim()
+      );
       payload.append("locationImageUrl", formData.locationImage || FALLBACK_LOCATION_IMAGE);
       payload.append("avatarType", formData.avatarType || "store_owner");
       payload.append(
@@ -850,6 +862,23 @@ const MainSettings = () => {
             value={formData.locationName}
             onChange={(e) => handleChange("locationName", e.target.value)}
             placeholder="Enter scenario location"
+            className="w-full rounded-2xl border-2 border-caregiver-peach p-4 text-lg focus:outline-none"
+          />
+        </ToggleRow>
+
+        <ToggleRow
+          title="Scenario Description"
+          enabled={settings.scenarioDescriptionEnabled}
+          onToggle={() => handleToggle("scenarioDescriptionEnabled")}
+        >
+          <label className="mb-2 block text-lg font-bold text-text-brown">
+            Describe what the child will practise in this scenario
+          </label>
+          <textarea
+            rows={4}
+            value={formData.scenarioDescription}
+            onChange={(e) => handleChange("scenarioDescription", e.target.value)}
+            placeholder="Enter a short description for this scenario"
             className="w-full rounded-2xl border-2 border-caregiver-peach p-4 text-lg focus:outline-none"
           />
         </ToggleRow>

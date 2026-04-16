@@ -94,6 +94,9 @@ const ScenariosPage = () => {
         ),
         description:
           scenario.description ||
+          scenario.scenarioDescription ||
+          scenario.settings?.scenarioDescription ||
+          scenario.settings?.scenario_description ||
           "Learn how to greet a friend and start a conversation!",
       }));
     }
