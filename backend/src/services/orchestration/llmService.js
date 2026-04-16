@@ -17,6 +17,66 @@ function personalityGuide(personality) {
   return map[personality] || map.personable_familiar;
 }
 
+export function getCharacterVoice(scenario = {}) {
+  const avatarType = scenario.avatarType || "store_owner";
+  const avatarLabel = String(scenario.avatarLabel || "").trim() || "Store Owner";
+  const locationName = String(scenario.locationName || "").trim() || "school canteen";
+
+  if (avatarType === "teacher") {
+    return {
+      avatarType,
+      avatarLabel,
+      identity: `${avatarLabel}, a warm and attentive teacher in ${locationName}`,
+      menuLead: "Hello there",
+      followUpLead: "Take your time",
+      paymentLead: "When you're ready",
+      endLead: "Well done",
+      encourageLead: "You're doing well",
+      smallTalkLead: "Hello",
+    };
+  }
+
+  if (avatarType === "student") {
+    return {
+      avatarType,
+      avatarLabel,
+      identity: `${avatarLabel}, a friendly student in ${locationName}`,
+      menuLead: "Hey",
+      followUpLead: "No rush",
+      paymentLead: "When you're ready",
+      endLead: "Nice job",
+      encourageLead: "It's okay",
+      smallTalkLead: "Hey",
+    };
+  }
+
+  if (avatarType === "custom") {
+    return {
+      avatarType,
+      avatarLabel,
+      identity: `${avatarLabel} in ${locationName}`,
+      menuLead: "Hello",
+      followUpLead: "Take your time",
+      paymentLead: "When you're ready",
+      endLead: "Well done",
+      encourageLead: "You're doing well",
+      smallTalkLead: "Hello",
+    };
+  }
+
+  return {
+    avatarType,
+    avatarLabel,
+    identity: `${avatarLabel}, a western stall owner in ${locationName}`,
+    menuLead: "Hi there",
+    followUpLead: "Okay",
+    paymentLead: "Please",
+    endLead: "Great job",
+    encourageLead: "It's okay",
+    smallTalkLead: "Hi",
+  };
+}
+
 /**
  * Tells the response generator what each backend-selected action should sound like.
  */
@@ -202,16 +262,19 @@ export function buildPrompt({
   const scenarioObjectives = (context.scenario.objectives || [])
     .map((objective, index) => `${index + 1}. ${objective.description}`)
     .join(" ");
+  const characterVoice = getCharacterVoice(context.scenario);
 
   return `
-You are a western stall owner in a school canteen.
-Stay in character.
+You are roleplaying as ${characterVoice.identity}.
+Stay in character at all times.
 Keep replies short, child-friendly, natural, and under 30 words.
 Do not narrate actions.
 Do not explain your reasoning.
 Only talk about this menu: ${menuText}.
 
-Personality: ${personalityGuide(context.scenario.personality)}
+Character role: ${characterVoice.avatarLabel}
+Scenario description: ${context.scenario.description || "none"}
+Backend personality style: ${personalityGuide(context.scenario.personality)}
 Configured AI personality prompt: ${context.scenario.aiPersonalityPrompt || "none"}
 Current action: ${action}
 Action instruction: ${actionGuide(action)}
@@ -233,6 +296,9 @@ Interpreted confidence: ${interpretation?.confidence ?? "unknown"}
 Asked about payment modes: ${interpretation?.asksPaymentOptions ? "yes" : "no"}
 
 Rules:
+- The character role and configured AI personality prompt are top priority for tone and wording.
+- Sound like ${characterVoice.avatarLabel} in every reply, not a generic assistant.
+- If the configured AI personality prompt conflicts with the default role, prefer the configured AI personality prompt while staying inside the scenario.
 - Stay aligned with the current action.
 - Follow the configured AI personality prompt and contingencies when they fit the current action.
 - Keep the response supportive of the scenario objectives without explicitly listing the objectives to the child.
@@ -268,26 +334,27 @@ Rules:
 /**
  * Returns deterministic wording when OpenAI is unavailable or a generated response is rejected.
  */
-function fallbackMessage(action, selectedMenu, customizations = [], childMemory) {
+function fallbackMessage(context, action, selectedMenu, customizations = [], childMemory) {
   const itemName = selectedMenu?.name || "";
   const joinedCustomizations = customizations.length
     ? ` with ${customizations.join(", ")}`
     : "";
+  const characterVoice = getCharacterVoice(context?.scenario || {});
 
   const templates = {
-    greet: "Hi there! What would you like from the western stall today?",
+    greet: `${characterVoice.menuLead}! What would you like today?`,
     list_menu:
       "We have Chicken Chop, Fish and Chips, Spaghetti, and Burger. What would you like?",
     clarify:
       "Sure. Please tell me which food you want from the menu.",
     follow_up:
-      `Okay, ${itemName || "that"}. Any changes or anything else?`,
+      `${characterVoice.followUpLead}, ${itemName || "that"}. Any changes or anything else?`,
     confirm_order:
       `Okay! ${itemName || "Your order"}${joinedCustomizations}. Is that correct?`,
-    request_payment: 
-      `Please make payment for ${itemName|| "your order"}${joinedCustomizations}. Cash or card is okay.`,
-    end: 
-        `Great job ordering ${itemName || "your food"}! Here is your food. Enjoy your recess!`,
+    request_payment:
+      `${characterVoice.paymentLead}, you can make payment for ${itemName || "your order"}${joinedCustomizations}. Cash or card is okay.`,
+    end:
+      `${characterVoice.endLead} ordering ${itemName || "your food"}! Here it is. Enjoy!`,
 
 
     ask_quantity:
@@ -313,12 +380,12 @@ function fallbackMessage(action, selectedMenu, customizations = [], childMemory)
     model_response:
       "You can say: I want Chicken Chop please.",
     encourage:
-      "It is okay, take your time. You are doing well.",
+      `${characterVoice.encourageLead}. Take your time.`,
     hint:
       "You can say: I want Fish and Chips please.",
 
     small_talk:
-      "Hi! Hungry today? What would you like to eat?",
+      `${characterVoice.smallTalkLead}! What would you like to eat today?`,
     repeat:
       `Let me say it again: ${itemName || "please tell me your order clearly"}.`,
     rephrase:
@@ -358,7 +425,7 @@ export async function generateScenarioReply({
   interpretation,
 }) {
   if (!client) {
-    const fallback = fallbackMessage(action, selectedMenu, customizations, childMemory);
+    const fallback = fallbackMessage(context, action, selectedMenu, customizations, childMemory);
     if (action === "list_menu") {
       return {
         ...fallback,
@@ -387,7 +454,7 @@ export async function generateScenarioReply({
         {
           role: "system",
           content:
-            "You generate short natural language for a guided AAC role-play. Output valid JSON only.",
+            `You generate short natural language for a guided AAC role-play. Stay fully in character as ${getCharacterVoice(context.scenario).identity}. Output valid JSON only.`,
         },
         {
           role: "user",
@@ -402,7 +469,9 @@ export async function generateScenarioReply({
 
     return {
       action: parsed.action || action,
-      message: parsed.message || fallbackMessage(action, selectedMenu, customizations, childMemory).message,
+      message:
+        parsed.message ||
+        fallbackMessage(context, action, selectedMenu, customizations, childMemory).message,
       hintUsed: Boolean(parsed.hintUsed),
       orderSummary: {
         item: parsed.orderSummary?.item || selectedMenu?.name || "",
@@ -411,7 +480,7 @@ export async function generateScenarioReply({
       },
     };
   } catch (error) {
-    const fallback = fallbackMessage(action, selectedMenu, customizations, childMemory);
+    const fallback = fallbackMessage(context, action, selectedMenu, customizations, childMemory);
     return {
       ...(action === "list_menu"
         ? {

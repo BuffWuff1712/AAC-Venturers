@@ -161,7 +161,7 @@ caregiverRoutes.get("/scenarios", (req, res) => {
         FROM scenarios s
         LEFT JOIN scenario_settings ss
         ON s.scenario_id = ss.scenario_id
-        ORDER BY s.created_at DESC
+        ORDER BY s.created_at ASC
       `)
       .all();
 

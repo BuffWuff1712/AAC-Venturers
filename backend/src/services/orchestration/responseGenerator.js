@@ -1,4 +1,4 @@
-import { generateScenarioReply } from "./llmService.js";
+import { generateScenarioReply, getCharacterVoice } from "./llmService.js";
 
 /**
  * Returns a deterministic reply for fast, factual actions where LLM creativity is not needed.
@@ -19,19 +19,20 @@ function buildDeterministicResponse({
   const availableOptions = (selectedMenu?.customizations || [])
     .filter(Boolean)
     .join(", ");
+  const characterVoice = getCharacterVoice(context.scenario);
 
   const deterministicMessages = {
-    list_menu: `We have ${context.menu.map((item) => item.name).join(", ")}. What would you like?`,
+    list_menu: `${characterVoice.menuLead}! We have ${context.menu.map((item) => item.name).join(", ")}. What would you like?`,
     confirm_order: `Okay! ${itemName || "Your order"}${customizationText}. Is that correct?`,
     request_payment: interpretation?.asksPaymentOptions
-      ? `You can pay by cash or card for ${itemName || "your order"}${customizationText}.`
-      : `Please pay when ready for ${itemName || "your order"}${customizationText}. Cash or card is okay.`,
-    end: `Great job ordering ${itemName || "your food"}! Here is your food. Enjoy your recess!`,
+      ? `${characterVoice.paymentLead}, you can pay by cash or card for ${itemName || "your order"}${customizationText}.`
+      : `${characterVoice.paymentLead}, please pay for ${itemName || "your order"}${customizationText}. Cash or card is okay.`,
+    end: `${characterVoice.endLead} ordering ${itemName || "your food"}! Here it is. Enjoy!`,
     ask_customization: interpretation?.asksCustomizationOptions
       ? `For ${itemName || "that"}, you can choose ${availableOptions || "no customisations"}.`
       : `Any changes for ${itemName || "that"}? You can also say no customisations.`,
     suggest_usual: `Welcome back! Do you want your usual ${childMemory?.favouriteOrder || itemName || "order"}?`,
-    follow_up: "No problem. What would you like to change?",
+    follow_up: `${characterVoice.followUpLead}. What would you like to change?`,
   };
 
   if (!deterministicMessages[action]) {
